@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Call</title><link rel="stylesheet" href="../styles/app.css"></head>
+<body><main class="app-shell detail-page"><nav class="shell-nav"><a class="back" href="transcripts.html">← All calls</a><span class="shell-label">Echo</span></nav>
+<p id="message" role="status">Loading…</p><section id="detail" hidden>
+<div class="call-summary"><header class="detail-heading"><div class="title-area"><div class="title-display"><h1 id="heading"></h1><span id="edit-action"></span></div>
+<form id="rename" hidden><input id="title" aria-label="Call title" maxlength="300" required autocomplete="off"></form></div>
+<div id="actions" class="actions"></div></header>
+<p id="meta" class="muted"></p><p id="participants" class="muted"></p>
+</div><article id="blocks" aria-label="Conversation"></article></section></main>
+<script type="module" src="transcript.js"></script></body></html>

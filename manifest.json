@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Echo",
+  "version": "1.2.0",
+  "description": "Save Google Meet live captions as local transcripts.",
+  "icons": {
+    "16": "icons/echo-16.png",
+    "32": "icons/echo-32.png",
+    "48": "icons/echo-48.png",
+    "128": "icons/echo-128.png"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "unlimitedStorage"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "options_page": "pages/settings.html",
+  "action": {
+    "default_title": "Open local transcripts",
+    "default_icon": {
+      "16": "icons/echo-16.png",
+      "32": "icons/echo-32.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "content/captions.js",
+        "content/overlay.js",
+        "content/chat.js",
+        "content/meet.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

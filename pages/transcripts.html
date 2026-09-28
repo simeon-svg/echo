@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transcripts</title><link rel="stylesheet" href="../styles/app.css"></head>
+<body><main class="app-shell calls-page"><header class="page-heading"><div><h1>Calls</h1><p class="muted">Your conversations, kept on this device.</p></div>
+<div class="listing-controls"><input id="search" type="search" aria-label="Search calls, participants, or transcript" placeholder="Search calls…" autocomplete="off"><a class="settings-link" href="settings.html">Settings</a></div></header>
+<div id="bulk" class="bulk-toolbar" hidden aria-label="Selected calls"><span id="selection-count" role="status"></span>
+<div class="bulk-actions"><button id="merge">Merge</button><button id="bulk-delete" class="danger">Delete</button><button id="clear-selection">Clear selection</button></div></div>
+<p id="message" role="status">Loading…</p><div id="list"></div></main>
+<script type="module" src="transcripts.js"></script></body></html>

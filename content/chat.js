@@ -1,0 +1,51 @@
+(() => {
+  "use strict";
+  const NOTICE = "Quick heads-up: I'm saving a text transcript of this call using Meet's live captions, just for my notes. It stays on my device; no audio or video is recorded.";
+  const visible = el => el && el.getClientRects().length > 0;
+  const input = () => [...document.querySelectorAll('textarea[aria-label="Send a message"]')].find(visible);
+  const button = label => [...document.querySelectorAll('button[aria-label]')]
+    .find(el => el.getAttribute("aria-label") === label && visible(el));
+  const waitFor = async (predicate, active) => {
+    for (let n = 0; n < 30; n++) {
+      if (!active()) throw new Error("Call ended before the chat notice was sent.");
+      const found = predicate(); if (found) return found;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error("Chat notice could not be sent. Please let participants know manually.");
+  };
+  globalThis.MeetChatNotice = class {
+    constructor() { this.attempted = false; this.warning = ""; }
+    async send(active, changed) {
+      if (this.attempted) return;
+      this.attempted = true; // Never duplicate an uncertain send or send on Resume.
+      let field;
+      try {
+        if (!input()) {
+          const open = button("Chat with everyone");
+          if (!open) throw new Error("Meeting chat is unavailable. Please announce the transcript manually.");
+          open.click();
+        }
+        field = await waitFor(input, active);
+        if (field.value.trim()) throw new Error("Chat notice not sent because you have a draft. Please announce the transcript manually.");
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+        setter.call(field, NOTICE);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        const send = await waitFor(() => {
+          const el = button("Send a message");
+          return el && !el.disabled && el.getAttribute("aria-disabled") !== "true" ? el : null;
+        }, active);
+        // A user's edit while waiting must never be sent by the extension.
+        if (field.value !== NOTICE) throw new Error("Chat draft changed. Please announce the transcript manually.");
+        send.click();
+        await waitFor(() => !field.value && document.body.innerText.includes(NOTICE), active);
+      } catch (e) {
+        this.warning = e.message;
+        // Do not clear user edits, and don't automatically resend an uncertain send.
+        if (field?.value === NOTICE) {
+          field.value = ""; field.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+      changed();
+    }
+  };
+})();

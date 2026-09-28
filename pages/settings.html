@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Echo settings</title><link rel="stylesheet" href="../styles/app.css"></head>
+<body><main class="app-shell">
+<nav class="shell-nav"><a class="back" href="transcripts.html">← All calls</a></nav>
+<header class="page-heading"><div><h1>Settings</h1><p class="muted">Your preferences, saved on this device.</p></div></header>
+<form id="settings" class="call-summary settings-form">
+<label class="setting-row" for="auto-start"><span><strong>Start recording automatically</strong><span class="muted">Start when you join a Meet call. When off, use the play button in the Echo panel. Applies to your next call.</span></span><input id="auto-start" type="checkbox" disabled></label>
+<label class="setting-row" for="announce-recording"><span><strong>Announce recording in chat</strong><span class="muted">Automatically send a heads-up when the first recording starts in a call. Turning this on later will not send a message for an already started recording.</span></span><input id="announce-recording" type="checkbox" disabled></label>
+<p class="muted">Changes save automatically.</p>
+</form></main><script type="module" src="settings.js"></script></body></html>
