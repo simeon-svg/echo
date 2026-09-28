@@ -24,6 +24,15 @@ mode changes apply when joining the next call. In manual mode, press Play in the
 Echo panel to begin; captions are not enabled until then. Enabling announcements
 after the first recording has started does not send a delayed notice.
 
+Settings can also enable automatic TXT backups. Choose a parent folder and Echo
+creates `Echo Backups/YYYY-MM/` inside it. Each completed or recovered interrupted
+conversation is saved as `<title> -- <stable-id>.txt` in the month when the call
+started. The file contains the Echo ID, call metadata, participants, and timestamped
+speaker text. Existing conversations can be backed up when the folder is selected,
+and **Back up now** recreates missing files and refreshes changed ones. Changing
+folders can copy the current library without deleting the old archive. Disabling
+or disconnecting backup never deletes existing files.
+
 Join a call with the Meet interface in English. By default, the extension detects **Leave
 call**, enables captions, and begins once the caption control and region are
 confirmed. It does not start on the pre-join screen. A small bottom-left overlay
@@ -55,6 +64,22 @@ transcripts. Search titles, speaker names, and text. Open a transcript to rename
 it, download UTF-8 TXT, copy it, or delete it. Stop active transcripts before
 deleting. There is no expiration or automatic deletion.
 
+When automatic backup is enabled, every call row has a backup indicator: green is
+up to date, amber is pending or waiting for folder permission, and red means an
+actual filesystem write failed. Hover for details. An amber permission indicator
+can be clicked to grant access and immediately back up every pending conversation;
+a red indicator retries that conversation. Echo queues permission-blocked writes
+instead of treating them as failures. It also sets an extension badge and sends
+one notification until access is restored.
+Deleting a conversation can optionally delete its TXT backup; that option is off
+by default. If the folder is unavailable, the local conversation is still deleted
+and Echo reports that the independent backup remains.
+
+Merging conversations creates a new conversation identity and, when backup is
+enabled, a new merged TXT file. The original TXT files are preserved by default.
+The merge confirmation can explicitly delete them; if folder access fails, the
+merge still completes and Echo reports which original backups remain.
+
 ## Local storage and recovery
 
 Transcripts are stored in the extension origin's IndexedDB database
@@ -63,6 +88,16 @@ site storage or `chrome.storage.sync`. Chrome manages the underlying files in
 the current profile. Data survives normal Chrome restarts, but removing the
 extension or deleting its profile data removes transcripts; TXT downloads are
 independent copies.
+
+The selected backup-folder handle and per-conversation backup status are stored in
+the same extension-owned IndexedDB database. Chrome may require the folder to be
+reconnected after permission is lost. Backup TXT files remain ordinary independent
+files after extension data is cleared or the extension is removed. They are a
+human-readable archive only; Echo does not import or restore them into its library.
+When Chrome offers the choice, select **Allow on every visit** to keep folder access
+across browser sessions. Interactive merge and delete actions request access from
+their confirmation button, while failed file deletions remain queued and are retried
+after access is granted again.
 
 Caption changes are saved after at most approximately 350 ms while Chrome is
 scheduling the tab normally. Recording and paused sessions send a heartbeat
@@ -88,6 +123,8 @@ interrupt recording. Interrupted sessions remain readable and exportable.
 - Meeting title comes from the page title, with a dated Google Meet fallback.
 - Local storage is not application-encrypted; it has the protection of your
   Chrome profile and operating-system account.
+- Automatic backup files are also unencrypted. Anyone with access to the selected
+  filesystem folder can read them.
 - A service-worker suspension alone does not lose data: it reopens IndexedDB on
   the next message. Extension reloads require reloading existing Meet tabs.
 

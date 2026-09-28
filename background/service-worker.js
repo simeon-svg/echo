@@ -1,5 +1,14 @@
 import { allSessions, getSession, saveSession, deleteSession } from "../storage/storage.js";
 import { callIdOf, groupCalls } from "../storage/calls.js";
+import {
+  backupFolderStatus,
+  forgetCallBackup,
+  refreshBackupAlert,
+  removeCallBackup,
+  syncCalls,
+  syncOne,
+  withBackupStatus,
+} from "../storage/backup.js";
 
 // Serialize writes so a late heartbeat cannot undo Stop or a title edit.
 let queue = Promise.resolve();
@@ -10,6 +19,7 @@ function serial(work) {
 }
 const open = s => s.status === "recording" || s.status === "paused";
 async function finalize(tabId, reason, status = "completed", token) {
+  const affected = new Set();
   for (const s of await allSessions()) {
     if (s.tabId !== tabId || !open(s) || (token && s.token !== token)) continue;
     s.status = status;
@@ -17,6 +27,11 @@ async function finalize(tabId, reason, status = "completed", token) {
     s.duration = Math.max(0, s.endTime - s.startTime);
     s.reason = reason;
     await saveSession(s);
+    affected.add(callIdOf(s));
+  }
+  if (affected.size) {
+    const calls = groupCalls(await allSessions()).filter(call => affected.has(call.id));
+    await syncCalls(calls);
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
@@ -58,31 +73,68 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const renamed = existing?.renamed ? existing : (await allSessions()).find(item => callIdOf(item) === callIdOf(s) && item.renamed);
       if (renamed) { s.title = renamed.title; s.renamed = true; }
       await saveSession(s);
+      if (s.status === "completed") {
+        const call = groupCalls(await allSessions()).find(call => call.id === callIdOf(s));
+        if (call) await syncCalls([call]);
+      }
       return true;
     }
     const sessions = await allSessions();
     const calls = groupCalls(sessions);
-    if (message.type === "list") return calls;
+    if (message.type === "list") return withBackupStatus(calls);
+    if (message.type === "backupFolderStatus") return backupFolderStatus();
+    if (message.type === "backupEnable") {
+      await chrome.storage.local.set({ backupEnabled: !!message.enabled });
+      if (!message.enabled) {
+        await refreshBackupAlert(false);
+        return { backed: 0, failed: 0 };
+      }
+      return message.backfill ? syncCalls(calls, { force: true }) : syncCalls([], { force: false });
+    }
+    if (message.type === "backupAll") return syncCalls(calls, { force: true });
+    if (message.type === "backupOne") {
+      const selected = calls.find(call => call.id === message.id);
+      if (!selected) throw new Error("Transcript no longer exists");
+      return syncOne(selected);
+    }
     if (message.type === "deleteMany") {
       const selected = calls.filter(call => message.ids?.includes(call.id));
       if (!selected.length) throw new Error("No calls selected");
       if (selected.some(open)) throw new Error("Stop recording before deleting selected calls");
-      for (const call of selected) for (const id of call.segmentIds) await deleteSession(id);
-      return true;
+      const warnings = [];
+      for (const call of selected) {
+        if (message.deleteBackup) {
+          const warning = await removeCallBackup(call);
+          if (warning) warnings.push(`${call.title}: ${warning}`);
+        } else await forgetCallBackup(call.id);
+        for (const id of call.segmentIds) await deleteSession(id);
+      }
+      await refreshBackupAlert(false);
+      return { backupWarning: warnings.join("\n") || null };
     }
     if (message.type === "merge") {
       const selected = calls.filter(call => message.ids?.includes(call.id));
       if (selected.length < 2) throw new Error("Select at least two calls to merge");
       if (selected.some(open)) throw new Error("Stop recording before merging calls");
       const target = selected.reduce((a, b) => a.startTime < b.startTime ? a : b);
+      const mergedId = crypto.randomUUID();
+      const warnings = [];
+      for (const call of selected) {
+        if (message.deleteBackups) {
+          const warning = await removeCallBackup(call);
+          if (warning) warnings.push(`${call.title}: ${warning}`);
+        } else await forgetCallBackup(call.id);
+      }
       const ids = new Set(selected.flatMap(call => call.segmentIds));
       for (const s of sessions.filter(s => ids.has(s.id))) {
-        s.callId = target.id; s.title = target.title; s.renamed = true; await saveSession(s);
+        s.callId = mergedId; s.title = target.title; s.renamed = true; await saveSession(s);
       }
-      return target.id;
+      const merged = groupCalls(await allSessions()).find(call => call.id === mergedId);
+      if (merged) await syncCalls([merged], { force: true });
+      return { id: mergedId, backupWarning: warnings.join("\n") || null };
     }
     const call = calls.find(s => s.id === message.id || s.segmentIds.includes(message.id));
-    if (message.type === "get") return call || null;
+    if (message.type === "get") return call ? (await withBackupStatus([call]))[0] : null;
     if (!call) throw new Error("Transcript no longer exists");
     const members = sessions.filter(s => call.segmentIds.includes(s.id));
     if (message.type === "rename") {
@@ -90,12 +142,18 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         s.title = String(message.title).trim().slice(0, 300) || s.title;
         s.renamed = true; await saveSession(s);
       }
-      return groupCalls(members)[0];
+      const renamed = groupCalls(members)[0];
+      await syncCalls([renamed], { force: true });
+      return (await withBackupStatus([renamed]))[0];
     }
     if (message.type === "delete") {
       if (open(call)) throw new Error("Stop this transcript before deleting it");
+      let backupWarning = null;
+      if (message.deleteBackup) backupWarning = await removeCallBackup(call);
+      else await forgetCallBackup(call.id);
       for (const s of members) await deleteSession(s.id);
-      return true;
+      await refreshBackupAlert(false);
+      return { backupWarning };
     }
     throw new Error("Unknown message");
   }).then(value => respond({ ok: true, value }), error => respond({ ok: false, error: error.message }));

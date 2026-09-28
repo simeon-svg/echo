@@ -1,4 +1,5 @@
-import { request, time, date, minutes, plainText, node, iconButton, isOpen, statusDot, notify } from "./shared.js";
+import { confirmDeletion, request, time, date, minutes, plainText, node, iconButton, isOpen, statusDot, notify } from "./shared.js";
+import { prepareBackupAccess, requestBackupAccess } from "./backup-access.js";
 const id = new URLSearchParams(location.search).get("id");
 const $ = selector => document.querySelector(selector);
 let session, editing = false, saving = false, recoveryNotified = false;
@@ -49,9 +50,13 @@ function render() {
   const [copyAction, downloadAction, deleteAction] = $("#actions").children;
   copyAction.addEventListener("click", () => run(async () => { await copyText(plainText(session)); notify("Transcript copied."); }));
   downloadAction.addEventListener("click", download);
-  deleteAction.classList.add("danger"); deleteAction.disabled = isOpen(session); deleteAction.addEventListener("click", () => {
-      if (confirm(`Permanently delete “${session.title}” and all its recording segments?`)) run(async () => {
-        await request("delete", { id }); location.href = "transcripts.html";
+  deleteAction.classList.add("danger"); deleteAction.disabled = isOpen(session); deleteAction.addEventListener("click", async () => {
+      if (session.hasBackup) await prepareBackupAccess();
+      const decision = await confirmDeletion({ label: session.title, backupAvailable: !!session.hasBackup, beforeDeleteBackup: requestBackupAccess });
+      if (decision.confirmed) run(async () => {
+        const result = await request("delete", { id, deleteBackup: decision.deleteBackup });
+        if (result.backupWarning) alert(`The conversation was deleted, but its backup remains.\n\n${result.backupWarning}`);
+        location.href = "transcripts.html";
       });
     });
   $("#blocks").replaceChildren();

@@ -5,20 +5,27 @@ const vm = require('node:vm');
 
 function setup() {
   const records = new Map();
+  const forgottenBackups = [], removedBackups = [], syncedCalls = [];
   const event = () => ({ addListener(fn) { this.fire = fn; } });
   const chrome = {
     runtime: { onMessage: event(), onStartup: event(), onInstalled: event(), getURL: path => `chrome-extension://test/${path}` },
     tabs: { onRemoved: event(), onUpdated: event(), create: async () => {} },
     action: { onClicked: event() }, alarms: { onAlarm: event(), create: async () => {} },
+    storage: { local: { set: async () => {}, get: async defaults => defaults } },
   };
   const context = vm.createContext({ chrome, console, Date, URL, crypto: require("node:crypto").webcrypto,
     allSessions: async () => structuredClone([...records.values()]),
     getSession: async id => structuredClone(records.get(id)),
     saveSession: async s => records.set(s.id, structuredClone(s)),
     deleteSession: async id => records.delete(id),
+    backupFolderStatus: async () => ({ enabled: false }),
+    forgetCallBackup: async id => forgottenBackups.push(id), refreshBackupAlert: async () => {},
+    removeCallBackup: async call => { removedBackups.push(call.id); return null; },
+    syncCalls: async calls => { syncedCalls.push(...structuredClone(calls)); return { backed: calls.length, failed: 0 }; }, syncOne: async () => ({}),
+    withBackupStatus: async calls => calls,
   });
   vm.runInContext(fs.readFileSync('storage/calls.js', 'utf8').replace(/export /g, ''), context);
-  const code = fs.readFileSync('background/service-worker.js', 'utf8').replace(/^import .*;\n/gm, '');
+  const code = fs.readFileSync('background/service-worker.js', 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
   vm.runInContext(code, context);
   const meet = { tab: { id: 7 }, url: 'https://meet.google.com/abc-defg-hij' };
   const page = { tab: { id: 8 }, url: 'chrome-extension://test/pages/transcript.html' };
@@ -26,7 +33,7 @@ function setup() {
   const drain = () => vm.runInContext('queue', context);
   const session = { id: 'one', token: 'doc-one', title: 'Test', startTime: Date.now() - 10000,
     status: 'recording', participants: ['You'], blocks: [{ speaker: 'You', timestamp: Date.now(), text: 'Hello' }] };
-  return { records, chrome, send, page, session, drain };
+  return { records, chrome, send, page, session, drain, forgottenBackups, removedBackups, syncedCalls };
 }
 
 test('paused transcript is completed on tab closure and late writes cannot reopen it', async () => {
@@ -109,17 +116,34 @@ test('start/stop segments form one call, including rename and combined export da
   assert.equal((await t.send({ type: 'delete', id: call.callId }, t.page)).ok, false);
 });
 
-test('manual merge preserves old sessions and deletes all segments together', async () => {
+test('manual merge creates a new conversation identity and preserves original backup files by default', async () => {
   const t = setup();
   await t.send({ type: 'create', session: { ...t.session, status: 'completed' } });
   await t.send({ type: 'create', session: { ...t.session, id: 'two', token: 'two', status: 'completed' } });
   const merged = await t.send({ type: 'merge', ids: ['one', 'two'] }, t.page);
   assert.equal(merged.ok, true);
+  assert.notEqual(merged.value.id, 'one');
+  assert.notEqual(merged.value.id, 'two');
   assert.equal(t.records.size, 2);
+  assert.deepEqual([...t.records.values()].map(record => record.callId), [merged.value.id, merged.value.id]);
+  assert.deepEqual(t.forgottenBackups.sort(), ['one', 'two']);
+  assert.deepEqual(t.removedBackups, []);
+  assert.equal(t.syncedCalls.at(-1).id, merged.value.id);
   assert.equal((await t.send({ type: 'list' }, t.page)).value.length, 1);
   assert.equal((await t.send({ type: 'get', id: 'two' }, t.page)).value.blocks.length, 2);
-  await t.send({ type: 'delete', id: merged.value }, t.page);
+  await t.send({ type: 'delete', id: merged.value.id }, t.page);
   assert.equal(t.records.size, 0);
+});
+
+test('manual merge can explicitly remove both original backup files', async () => {
+  const t = setup();
+  await t.send({ type: 'create', session: { ...t.session, status: 'completed' } });
+  await t.send({ type: 'create', session: { ...t.session, id: 'two', token: 'two', status: 'completed' } });
+  const merged = await t.send({ type: 'merge', ids: ['one', 'two'], deleteBackups: true }, t.page);
+  assert.equal(merged.ok, true);
+  assert.deepEqual(t.removedBackups.sort(), ['one', 'two']);
+  assert.deepEqual(t.forgottenBackups, []);
+  assert.equal(merged.value.backupWarning, null);
 });
 
 test('bulk delete rejects the whole selection if any call is still active', async () => {

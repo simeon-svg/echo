@@ -58,6 +58,110 @@ export function statusDot(status) {
   el.title = labels[status] || status; el.setAttribute("aria-label", el.title); el.setAttribute("role", "img");
   return el;
 }
+export function backupStatusDot(backup, retry) {
+  if (!backup) return null;
+  const labels = {
+    backed: "Backed up",
+    pending: "Backup pending",
+    "permission-required": "Backup is waiting for folder access. Click to grant folder access and back up all pending conversations",
+    failed: `Backup failed${backup.error ? `: ${backup.error}` : ""}. Click to try again`,
+  };
+  const actionable = ["failed", "permission-required"].includes(backup.status);
+  const el = node(actionable ? "button" : "span", undefined, `backup-dot ${backup.status}`);
+  if (actionable) el.type = "button";
+  const last = backup.backedAt ? ` Last successful backup: ${new Date(backup.backedAt).toLocaleString()}.` : "";
+  el.title = `${labels[backup.status] || backup.status}.${last}`;
+  el.setAttribute("aria-label", el.title);
+  if (actionable) el.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); retry(); });
+  else el.setAttribute("role", "img");
+  return el;
+}
+export function confirmAction({ title, message, confirmLabel = "Continue", cancelLabel = "Cancel", danger = false }) {
+  return new Promise(resolve => {
+    const dialog = node("dialog", undefined, "confirm-dialog");
+    const form = node("form"); form.method = "dialog";
+    form.append(node("h2", title), node("p", message, "muted dialog-message"));
+    const actions = node("div", undefined, "dialog-actions");
+    const confirm = node("button", confirmLabel, danger ? "danger primary-danger" : "primary-action"); confirm.type = "button";
+    let cancel = null;
+    if (cancelLabel) { cancel = node("button", cancelLabel); cancel.type = "button"; actions.append(cancel); }
+    actions.append(confirm); form.append(actions); dialog.append(form); document.body.append(dialog);
+    const finish = result => { dialog.close(); dialog.remove(); resolve(result); };
+    if (cancel) cancel.addEventListener("click", () => finish(false));
+    confirm.addEventListener("click", () => finish(true));
+    dialog.addEventListener("cancel", event => { event.preventDefault(); finish(false); });
+    dialog.showModal();
+  });
+}
+export async function showMessageDialog({ title, message, buttonLabel = "OK" }) {
+  await confirmAction({ title, message, confirmLabel: buttonLabel, cancelLabel: null });
+}
+export function confirmDeletion({ label, count = 1, backupAvailable = false, beforeDeleteBackup }) {
+  return new Promise(resolve => {
+    const dialog = node("dialog", undefined, "confirm-dialog");
+    const form = node("form"); form.method = "dialog";
+    form.append(node("h2", count === 1 ? `Delete “${label}”?` : `Delete ${count} conversations?`),
+      node("p", count === 1 ? "This permanently removes the conversation and all its recording segments from Echo." : "This permanently removes the selected conversations and all their recording segments from Echo.", "muted"));
+    const checkbox = node("input"); checkbox.type = "checkbox";
+    if (backupAvailable) {
+      const option = node("label", undefined, "delete-backup-option");
+      option.append(checkbox, node("span", count === 1 ? "Also delete its backup TXT file" : "Also delete their backup TXT files"));
+      form.append(option);
+    }
+    const errorMessage = node("p", undefined, "dialog-error"); errorMessage.hidden = true; errorMessage.setAttribute("role", "alert");
+    form.append(errorMessage);
+    const actions = node("div", undefined, "dialog-actions");
+    const cancel = node("button", "Cancel"); cancel.type = "button";
+    const remove = node("button", "Delete", "danger primary-danger"); remove.type = "button";
+    actions.append(cancel, remove); form.append(actions); dialog.append(form); document.body.append(dialog);
+    const finish = result => { dialog.close(); dialog.remove(); resolve(result); };
+    cancel.addEventListener("click", () => finish({ confirmed: false, deleteBackup: false }));
+    remove.addEventListener("click", async () => {
+      remove.disabled = true; errorMessage.hidden = true;
+      try {
+        if (backupAvailable && checkbox.checked && beforeDeleteBackup) await beforeDeleteBackup();
+        finish({ confirmed: true, deleteBackup: backupAvailable && checkbox.checked });
+      } catch (error) {
+        errorMessage.textContent = error.message; errorMessage.hidden = false; remove.disabled = false;
+      }
+    });
+    dialog.addEventListener("cancel", event => { event.preventDefault(); finish({ confirmed: false, deleteBackup: false }); });
+    dialog.showModal();
+  });
+}
+export function confirmMerge({ count, backupAvailable = false, beforeDeleteBackups }) {
+  return new Promise(resolve => {
+    const dialog = node("dialog", undefined, "confirm-dialog");
+    const form = node("form"); form.method = "dialog";
+    form.append(node("h2", `Merge ${count} conversations?`),
+      node("p", "Echo will create a new merged conversation with a new ID. Original backup files are kept unless you choose to delete them. If Chrome asks for access, choose “Allow on every visit”.", "muted"));
+    const checkbox = node("input"); checkbox.type = "checkbox";
+    if (backupAvailable) {
+      const option = node("label", undefined, "delete-backup-option");
+      option.append(checkbox, node("span", "Also delete the original backup TXT files"));
+      form.append(option);
+    }
+    const errorMessage = node("p", undefined, "dialog-error"); errorMessage.hidden = true; errorMessage.setAttribute("role", "alert");
+    form.append(errorMessage);
+    const actions = node("div", undefined, "dialog-actions");
+    const cancel = node("button", "Cancel"); cancel.type = "button";
+    const merge = node("button", "Merge", "primary-action"); merge.type = "button";
+    actions.append(cancel, merge); form.append(actions); dialog.append(form); document.body.append(dialog);
+    const finish = result => { dialog.close(); dialog.remove(); resolve(result); };
+    cancel.addEventListener("click", () => finish({ confirmed: false, deleteBackups: false }));
+    merge.addEventListener("click", async () => {
+      merge.disabled = true; errorMessage.hidden = true;
+      try {
+        if (backupAvailable && checkbox.checked && beforeDeleteBackups) await beforeDeleteBackups();
+        finish({ confirmed: true, deleteBackups: backupAvailable && checkbox.checked });
+      } catch (error) {
+        errorMessage.textContent = error.message; errorMessage.hidden = false; merge.disabled = false;
+      }
+    });
+    dialog.addEventListener("cancel", event => { event.preventDefault(); finish({ confirmed: false, deleteBackups: false }); });
+    dialog.showModal();
+  });
+}
 export function actionMenu(label, actions) {
   const details = node("details", undefined, "action-menu");
   const summary = node("summary", undefined, "icon-button");

@@ -7,5 +7,16 @@
 <form id="settings" class="call-summary settings-form">
 <label class="setting-row" for="auto-start"><span><strong>Start recording automatically</strong><span class="muted">Start when you join a Meet call. When off, use the play button in the Echo panel. Applies to your next call.</span></span><input id="auto-start" type="checkbox" disabled></label>
 <label class="setting-row" for="announce-recording"><span><strong>Announce recording in chat</strong><span class="muted">Automatically send a heads-up when the first recording starts in a call. Turning this on later will not send a message for an already started recording.</span></span><input id="announce-recording" type="checkbox" disabled></label>
-<p class="muted">Changes save automatically.</p>
+<label class="setting-row" for="backup-enabled"><span><strong>Automatically back up conversations</strong><span class="muted">Save a readable TXT copy after each conversation ends. Backup files are not encrypted.</span></span><input id="backup-enabled" type="checkbox" disabled></label>
+<section id="backup-controls" class="backup-settings" hidden aria-labelledby="backup-heading">
+  <div><strong id="backup-heading">Backup folder</strong><p id="backup-status" class="muted">No folder selected.</p><p id="backup-last" class="muted"></p></div>
+  <div class="setting-actions">
+    <button id="choose-folder" type="button">Choose folder</button>
+    <button id="reconnect-folder" type="button" hidden>Reconnect</button>
+    <button id="backup-now" type="button">Back up now</button>
+    <button id="disconnect-folder" type="button" class="danger">Disconnect folder</button>
+  </div>
+  <p class="backup-note muted">Echo creates <strong>Echo Backups</strong> inside the selected folder, organized into <code>YYYY-MM</code> folders. If Chrome asks again, choose <strong>Allow on every visit</strong> for persistent access. Disconnecting never deletes backup files.</p>
+</section>
+<p class="settings-note muted">All settings on this page save automatically.</p>
 </form></main><script type="module" src="settings.js"></script></body></html>
