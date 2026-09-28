@@ -17,7 +17,7 @@ function setup(draft = '') {
   const context = vm.createContext({ HTMLTextAreaElement: Textarea, Event: class {}, setTimeout,
     document: { body, querySelectorAll: selector => selector.startsWith('textarea') ? [field] : [send] } });
   vm.runInContext(fs.readFileSync('content/chat.js', 'utf8'), context);
-  return { notice: vm.runInContext('new MeetChatNotice()', context), field, count: () => sent };
+  return { context, notice: vm.runInContext('new MeetChatNotice()', context), field, count: () => sent, message: () => body.innerText };
 }
 test('notice sends once even when start is requested concurrently or repeatedly', async () => {
   const t = setup();
@@ -37,5 +37,14 @@ test('a call ending before sending cannot transmit a notice', async () => {
   const t = setup();
   await t.notice.send(() => false, () => {});
   assert.equal(t.count(), 0);
+  assert.equal(t.field.value, '');
+});
+
+test('notice sends the user-customized message', async () => {
+  const t = setup();
+  const notice = vm.runInContext('new MeetChatNotice("Custom announcement")', t.context);
+  await notice.send(() => true, () => {});
+  assert.equal(t.count(), 1);
+  assert.equal(t.message(), 'Custom announcement');
   assert.equal(t.field.value, '');
 });

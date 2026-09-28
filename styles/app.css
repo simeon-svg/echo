@@ -61,8 +61,9 @@ input {min-width:0;background:transparent;border:1px solid #e6e7e4;border-radius
 .settings-link {font-size:14px;color:var(--muted);text-decoration:none;padding:6px 8px;border-radius:7px;flex-shrink:0}
 .settings-link:hover {background:var(--hover);color:#242628}.shell-nav .settings-link {margin-left:auto}
 .settings-form {max-width:760px}.settings-note {margin:0;padding:16px 0 0;border-top:1px solid #eceee9}.setting-row {display:flex;align-items:center;gap:24px;padding:16px 0;cursor:pointer}
-.setting-row+.setting-row {border-top:1px solid #eceee9}.setting-row>span {flex:1}.setting-row strong {display:block;font-size:16px;font-weight:600;margin-bottom:5px}
+.setting-row+.setting-row,.settings-subcontrol+.setting-row {border-top:1px solid #eceee9}.setting-row>span {flex:1}.setting-row strong {display:block;font-size:16px;font-weight:600;margin-bottom:5px}
 .setting-row .muted {display:block;font-size:15px}.setting-row input {width:20px;height:20px;flex-shrink:0;accent-color:#4d6f9e;cursor:pointer}
+.settings-subcontrol {margin:0 0 4px 20px;padding:8px 0 16px}.settings-subcontrol label {display:block;margin-bottom:6px;color:inherit;font-size:14px;font-weight:600}.settings-subcontrol textarea {display:block;width:100%;min-height:76px;resize:vertical;padding:10px 12px;border:1px solid #e6e7e4;border-radius:8px;background:#fff;color:inherit;font:inherit;font-size:16px;line-height:1.5}
 .backup-settings {padding:8px 0 4px;margin-left:20px}.backup-settings>div:first-child>strong {font-size:14px;font-weight:600}
 .backup-settings p {margin:4px 0}.setting-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}
 .setting-actions button {border:1px solid #e1e4e0;background:#fff}.setting-actions button:hover {background:#f1f3ef}

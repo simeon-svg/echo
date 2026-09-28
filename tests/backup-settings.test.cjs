@@ -13,11 +13,12 @@ class Element {
 }
 
 async function setup(initialStatus = {}) {
-  const ids = ['settings', 'auto-start', 'announce-recording', 'backup-enabled', 'backup-controls', 'backup-status',
+  const ids = ['settings', 'auto-start', 'announce-recording', 'announce-message-controls', 'announce-message', 'backup-enabled', 'backup-controls', 'backup-status',
     'backup-last', 'reconnect-folder', 'backup-now', 'disconnect-folder', 'choose-folder'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
   const notices = [];
   const dialogs = [];
+  const savedSettings = [];
   let activeGesture = false, pickerCalls = 0, nativeConfirmCalls = 0, savedHandle = null;
   const handle = { name: 'Documents', async requestPermission() { return 'granted'; } };
   const backupStatus = { enabled: initialStatus.enabled ?? false, folderName: initialStatus.folderName ?? null,
@@ -40,13 +41,13 @@ async function setup(initialStatus = {}) {
       : { backed: 0, failed: 0 },
     clearBackupDirectory: async () => {}, getBackupDirectory: async () => null,
     setBackupDirectory: async value => { savedHandle = value; },
-    chrome: { storage: { local: { async get(defaults) { return defaults; }, async set() {}, async remove() {} }, onChanged: { addListener() {} } } },
+    chrome: { storage: { local: { async get(defaults) { return defaults; }, async set(values) { savedSettings.push(values); }, async remove() {} }, onChanged: { addListener() {} } } },
   });
   const source = fs.readFileSync('pages/settings.js', 'utf8').replace(/^import .*;\n/gm, '');
   vm.runInContext(source, context);
   await new Promise(resolve => setImmediate(resolve));
   return {
-    notices, dialogs, elements, pickerCalls: () => pickerCalls, nativeConfirmCalls: () => nativeConfirmCalls,
+    notices, dialogs, elements, savedSettings, pickerCalls: () => pickerCalls, nativeConfirmCalls: () => nativeConfirmCalls,
     savedHandle: () => savedHandle,
     async enableBackup() {
       elements['backup-enabled'].checked = true;
@@ -56,6 +57,10 @@ async function setup(initialStatus = {}) {
     async disableBackup() {
       elements['backup-enabled'].checked = false;
       await elements['backup-enabled'].fire('change');
+    },
+    async disableAnnouncements() {
+      elements['announce-recording'].checked = false;
+      await elements['announce-recording'].fire('change');
     },
   };
 }
@@ -79,4 +84,15 @@ test('disabling automatic backup hides the folder controls but keeps the folder 
   await page.disableBackup();
   assert.equal(page.elements['backup-controls'].hidden, true);
   assert.equal(page.elements['backup-enabled'].checked, false);
+});
+
+test('announcement message is visible when enabled and saves custom text', async () => {
+  const page = await setup();
+  assert.equal(page.elements['announce-message-controls'].hidden, false);
+  assert.match(page.elements['announce-message'].value, /Quick heads-up/);
+  page.elements['announce-message'].value = 'Custom announcement';
+  await page.elements['announce-message'].fire('change');
+  assert.equal(page.savedSettings.at(-1).announceMessage, 'Custom announcement');
+  await page.disableAnnouncements();
+  assert.equal(page.elements['announce-message-controls'].hidden, true);
 });

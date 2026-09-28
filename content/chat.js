@@ -14,7 +14,7 @@
     throw new Error("Chat notice could not be sent. Please let participants know manually.");
   };
   globalThis.MeetChatNotice = class {
-    constructor() { this.attempted = false; this.warning = ""; }
+    constructor(message = NOTICE) { this.message = message || NOTICE; this.attempted = false; this.warning = ""; }
     async send(active, changed) {
       if (this.attempted) return;
       this.attempted = true; // Never duplicate an uncertain send or send on Resume.
@@ -28,20 +28,20 @@
         field = await waitFor(input, active);
         if (field.value.trim()) throw new Error("Chat notice not sent because you have a draft. Please announce the transcript manually.");
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
-        setter.call(field, NOTICE);
+        setter.call(field, this.message);
         field.dispatchEvent(new Event("input", { bubbles: true }));
         const send = await waitFor(() => {
           const el = button("Send a message");
           return el && !el.disabled && el.getAttribute("aria-disabled") !== "true" ? el : null;
         }, active);
         // A user's edit while waiting must never be sent by the extension.
-        if (field.value !== NOTICE) throw new Error("Chat draft changed. Please announce the transcript manually.");
+        if (field.value !== this.message) throw new Error("Chat draft changed. Please announce the transcript manually.");
         send.click();
-        await waitFor(() => !field.value && document.body.innerText.includes(NOTICE), active);
+        await waitFor(() => !field.value && document.body.innerText.includes(this.message), active);
       } catch (e) {
         this.warning = e.message;
         // Do not clear user edits, and don't automatically resend an uncertain send.
-        if (field?.value === NOTICE) {
+        if (field?.value === this.message) {
           field.value = ""; field.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }

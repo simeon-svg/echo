@@ -1,11 +1,13 @@
 (async () => {
   "use strict";
-  const settings = await chrome.storage.local.get({ autoStart: true, announceRecording: true });
+  const DEFAULT_ANNOUNCE_MESSAGE = "Quick heads-up: I'm saving a text transcript of this call using Meet's live captions, just for my notes. It stays on my device; no audio or video is recorded.";
+  const settings = await chrome.storage.local.get({ autoStart: true, announceRecording: true, announceMessage: DEFAULT_ANNOUNCE_MESSAGE });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     for (const key of ["autoStart", "announceRecording"]) {
       if (changes[key]) settings[key] = changes[key].newValue ?? true;
     }
+    if (changes.announceMessage) settings.announceMessage = changes.announceMessage.newValue || DEFAULT_ANNOUNCE_MESSAGE;
   });
   // Verified in real Meet, September 24, 2026. Update these selectors first.
   const SELECTORS = { region: '[role="region"][aria-label="Captions"]',
@@ -121,7 +123,8 @@
     notify("Transcript recording started. Saved locally on this device.");
     if (!firstRecordingStarted) {
       firstRecordingStarted = true;
-      const currentNotice = notice;
+      const currentNotice = new MeetChatNotice(settings.announceMessage);
+      notice = currentNotice;
       if (settings.announceRecording) currentNotice.send(() => active && notice === currentNotice && settings.announceRecording, render);
     }
   }

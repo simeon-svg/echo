@@ -2,9 +2,16 @@ import { confirmAction, notify, request } from "./shared.js";
 import { clearBackupDirectory, getBackupDirectory, setBackupDirectory } from "../storage/storage.js";
 
 const $ = selector => document.querySelector(selector);
+const DEFAULT_ANNOUNCE_MESSAGE = "Quick heads-up: I'm saving a text transcript of this call using Meet's live captions, just for my notes. It stays on my device; no audio or video is recorded.";
 const fields = { autoStart: $("#auto-start"), announceRecording: $("#announce-recording") };
+const announceMessageControls = $("#announce-message-controls");
+const announceMessage = $("#announce-message");
 let directoryHandle = null;
 let busy = false;
+
+function updateAnnouncementMessageVisibility() {
+  announceMessageControls.hidden = !fields.announceRecording.checked;
+}
 
 async function savePreference(key, field) {
   const value = field.checked;
@@ -12,6 +19,12 @@ async function savePreference(key, field) {
   try { await chrome.storage.local.set({ [key]: value }); notify("Setting saved."); }
   catch (error) { field.checked = !value; notify(error.message, "error"); }
   finally { field.disabled = false; }
+}
+async function saveAnnouncementMessage() {
+  const value = announceMessage.value.trim() || DEFAULT_ANNOUNCE_MESSAGE;
+  announceMessage.value = value;
+  try { await chrome.storage.local.set({ announceMessage: value }); notify("Setting saved."); }
+  catch (error) { notify(error.message, "error"); }
 }
 async function refreshBackupStatus() {
   const status = await request("backupFolderStatus");
@@ -92,16 +105,24 @@ async function withBusy(work) {
 }
 async function load() {
   try {
-    const settings = await chrome.storage.local.get({ autoStart: true, announceRecording: true });
+    const settings = await chrome.storage.local.get({ autoStart: true, announceRecording: true, announceMessage: DEFAULT_ANNOUNCE_MESSAGE });
+    announceMessage.value = settings.announceMessage || DEFAULT_ANNOUNCE_MESSAGE;
     for (const [key, field] of Object.entries(fields)) {
       field.checked = settings[key]; field.disabled = false;
-      field.addEventListener("change", () => savePreference(key, field));
+      field.addEventListener("change", async () => {
+        if (key === "announceRecording") updateAnnouncementMessageVisibility();
+        await savePreference(key, field);
+        if (key === "announceRecording") updateAnnouncementMessageVisibility();
+      });
     }
+    updateAnnouncementMessageVisibility();
     directoryHandle = await getBackupDirectory();
     $("#backup-enabled").disabled = false;
     await refreshBackupStatus();
   } catch (error) { notify(error.message, "error"); }
 }
+
+announceMessage.addEventListener("change", saveAnnouncementMessage);
 
 $("#backup-enabled").addEventListener("change", event => withBusy(async () => {
   if (!event.target.checked) {

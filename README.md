@@ -33,6 +33,7 @@ telemetry, or cloud synchronization.
 
 - Optionally send one notice through Meet's own chat when the first recording
   starts in a call.
+- Edit the notice text in Settings; the custom message is saved on this device.
 - Do not replace an existing chat draft or use a messaging API.
 - Ask you to announce the transcript manually when chat is unavailable.
 

@@ -7,6 +7,10 @@
 <form id="settings" class="call-summary settings-form">
 <label class="setting-row" for="auto-start"><span><strong>Start recording automatically</strong><span class="muted">Start when you join a Meet call. When off, use the play button in the Echo panel. Applies to your next call.</span></span><input id="auto-start" type="checkbox" disabled></label>
 <label class="setting-row" for="announce-recording"><span><strong>Announce recording in chat</strong><span class="muted">Automatically send a heads-up when the first recording starts in a call. Turning this on later will not send a message for an already started recording.</span></span><input id="announce-recording" type="checkbox" disabled></label>
+<div id="announce-message-controls" class="settings-subcontrol" hidden>
+  <label for="announce-message">Message sent to Meet chat</label>
+  <textarea id="announce-message" rows="3" maxlength="500"></textarea>
+</div>
 <label class="setting-row" for="backup-enabled"><span><strong>Automatically back up conversations</strong><span class="muted">Save a readable TXT copy after each conversation ends. Backup files are not encrypted.</span></span><input id="backup-enabled" type="checkbox" disabled></label>
 <section id="backup-controls" class="backup-settings" hidden aria-labelledby="backup-heading">
   <div><strong id="backup-heading">Backup folder</strong><p id="backup-status" class="muted">No folder selected.</p><p id="backup-last" class="muted"></p></div>
