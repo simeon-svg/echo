@@ -12,7 +12,7 @@ class Element {
   async fire(name) { for (const callback of this.listeners[name] || []) await callback({ target: this, preventDefault() {} }); }
 }
 
-async function setup() {
+async function setup(initialStatus = {}) {
   const ids = ['settings', 'auto-start', 'announce-recording', 'backup-enabled', 'backup-controls', 'backup-status',
     'backup-last', 'reconnect-folder', 'backup-now', 'disconnect-folder', 'choose-folder'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
@@ -20,6 +20,8 @@ async function setup() {
   const dialogs = [];
   let activeGesture = false, pickerCalls = 0, nativeConfirmCalls = 0, savedHandle = null;
   const handle = { name: 'Documents', async requestPermission() { return 'granted'; } };
+  const backupStatus = { enabled: initialStatus.enabled ?? false, folderName: initialStatus.folderName ?? null,
+    permission: initialStatus.permission ?? 'missing', lastSuccess: null };
   const context = vm.createContext({
     console, setTimeout, clearTimeout,
     document: { querySelector: selector => elements[selector.slice(1)] },
@@ -32,8 +34,9 @@ async function setup() {
     confirm() { nativeConfirmCalls++; activeGesture = false; return true; },
     async confirmAction(options) { dialogs.push(options); return true; },
     notify(message, kind) { notices.push({ message, kind }); },
-    request: async type => type === 'backupFolderStatus'
-      ? { enabled: false, folderName: null, permission: 'missing', lastSuccess: null }
+    request: async (type, values) => type === 'backupFolderStatus'
+      ? backupStatus
+      : type === 'backupEnable' ? (backupStatus.enabled = !!values.enabled, { backed: 0, failed: 0 })
       : { backed: 0, failed: 0 },
     clearBackupDirectory: async () => {}, getBackupDirectory: async () => null,
     setBackupDirectory: async value => { savedHandle = value; },
@@ -50,6 +53,10 @@ async function setup() {
       activeGesture = true;
       await elements['backup-enabled'].fire('change');
     },
+    async disableBackup() {
+      elements['backup-enabled'].checked = false;
+      await elements['backup-enabled'].fire('change');
+    },
   };
 }
 
@@ -64,4 +71,12 @@ test('the first backup toggle opens the directory picker within the original use
     'Back up conversations as readable TXT files?',
     'Back up existing conversations?',
   ]);
+});
+
+test('disabling automatic backup hides the folder controls but keeps the folder connected', async () => {
+  const page = await setup({ enabled: true, folderName: 'Documents', permission: 'granted' });
+  assert.equal(page.elements['backup-controls'].hidden, false);
+  await page.disableBackup();
+  assert.equal(page.elements['backup-controls'].hidden, true);
+  assert.equal(page.elements['backup-enabled'].checked, false);
 });

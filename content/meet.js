@@ -13,14 +13,24 @@
   const visible = el => el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
   const controls = () => [...document.querySelectorAll('button[aria-label]')].filter(visible);
   const named = (buttons, name) => buttons.find(b => b.getAttribute("aria-label") === name);
+  function currentUserName() {
+    const label = [...document.querySelectorAll('[aria-label]')]
+      .map(element => element.getAttribute("aria-label")?.trim())
+      .find(value => /^(?:Google )?Account:\s*/i.test(value || ""));
+    if (!label) return "You";
+    const name = label.replace(/^(?:Google )?Account:\s*/i, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+    return name && !name.includes("@") ? name : "You";
+  }
   const ids = new WeakMap();
   let nextId = 0;
   function rows() {
     const region = document.querySelector(SELECTORS.region);
     if (!visible(region)) return [];
+    const localName = currentUserName();
     return [...region.querySelectorAll(SELECTORS.row)].map(el => {
       if (!ids.has(el)) ids.set(el, ++nextId);
-      return { id: ids.get(el), speaker: el.querySelector(SELECTORS.speaker)?.textContent || "",
+      const speaker = el.querySelector(SELECTORS.speaker)?.textContent || "";
+      return { id: ids.get(el), speaker: speaker === "You" ? localName : speaker,
         text: el.querySelector(SELECTORS.text)?.textContent || "" };
     });
   }
@@ -102,7 +112,7 @@
     let name = document.title.replace(/^Meet\s*[-–—]\s*/i, "").trim();
     if (/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(name) || /^(Google )?Meet$/i.test(name)) name = "";
     session = { id: crypto.randomUUID(), token: crypto.randomUUID(), ...call,
-      title: name ? `${name} — ${date}` : `Google Meet — ${date} — ${new Date(startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+      title: name ? `${name} — ${date}` : `${date} at ${new Date(startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
       date: new Date(startTime).toISOString(), startTime, endTime: null, duration: 0,
       participants: [], blocks: [], status: "recording" };
     mode = "recording"; error = "";

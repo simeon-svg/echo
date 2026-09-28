@@ -63,7 +63,7 @@ input {min-width:0;background:transparent;border:1px solid #e6e7e4;border-radius
 .settings-form {max-width:760px}.settings-note {margin:0;padding:16px 0 0;border-top:1px solid #eceee9}.setting-row {display:flex;align-items:center;gap:24px;padding:16px 0;cursor:pointer}
 .setting-row+.setting-row {border-top:1px solid #eceee9}.setting-row>span {flex:1}.setting-row strong {display:block;font-size:16px;font-weight:600;margin-bottom:5px}
 .setting-row .muted {display:block;font-size:15px}.setting-row input {width:20px;height:20px;flex-shrink:0;accent-color:#4d6f9e;cursor:pointer}
-.backup-settings {padding:18px 0 4px;border-top:1px solid #eceee9}.backup-settings>div:first-child>strong {font-size:16px}
+.backup-settings {padding:8px 0 4px;margin-left:20px}.backup-settings>div:first-child>strong {font-size:14px;font-weight:600}
 .backup-settings p {margin:4px 0}.setting-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}
 .setting-actions button {border:1px solid #e1e4e0;background:#fff}.setting-actions button:hover {background:#f1f3ef}
 .backup-note {padding:10px 12px;background:#f4f5f2;border-radius:8px}.backup-note code {font-size:13px}.backup-settings.busy {opacity:.62;pointer-events:none}

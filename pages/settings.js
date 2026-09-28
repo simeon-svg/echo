@@ -16,7 +16,7 @@ async function savePreference(key, field) {
 async function refreshBackupStatus() {
   const status = await request("backupFolderStatus");
   $("#backup-enabled").checked = status.enabled;
-  $("#backup-controls").hidden = !status.enabled && !status.folderName;
+  $("#backup-controls").hidden = !status.enabled;
   $("#backup-status").textContent = !status.folderName ? "No folder selected."
     : status.permission === "granted" ? `Connected to ${status.folderName}/Echo Backups.`
       : `Access to ${status.folderName} needs to be restored. Choose “Allow on every visit” when Chrome asks.`;
