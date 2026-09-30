@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Echo",
-  "version": "1.5.6",
+  "version": "1.5.7",
   "description": "Save Google Meet live captions as local transcripts.",
   "icons": {
     "16": "icons/echo-16.png",

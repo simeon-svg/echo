@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.7 — 2026-09-30
+
+- Replace the extension icon with an abstract radial soundwave in vivid coral orange.
+- Simplify the smallest toolbar icon to keep its rays distinct at 16px.
+- Enlarge the symbol within the 16px and 32px browser icons by reducing transparent margins.
+- Keep toolbar PNG dimensions equal to their declared sizes so browser scaling does not shrink the symbol.
+
 ## 1.5.6 — 2026-09-30
 
 - Close the notification panel when clicking outside the widget, preserving its messages.
