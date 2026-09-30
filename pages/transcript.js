@@ -1,4 +1,4 @@
-import { confirmDeletion, request, time, date, minutes, plainText, node, iconButton, isOpen, statusDot, notify } from "./shared.js";
+import { showMessageDialog, confirmDeletion, request, time, date, minutes, plainText, node, iconButton, isOpen, statusDot, notify } from "./shared.js";
 import { prepareBackupAccess, requestBackupAccess } from "./backup-access.js";
 const id = new URLSearchParams(location.search).get("id");
 const $ = selector => document.querySelector(selector);
@@ -50,15 +50,16 @@ function render() {
   const [copyAction, downloadAction, deleteAction] = $("#actions").children;
   copyAction.addEventListener("click", () => run(async () => { await copyText(plainText(session)); notify("Transcript copied."); }));
   downloadAction.addEventListener("click", download);
-  deleteAction.classList.add("danger"); deleteAction.disabled = isOpen(session); deleteAction.addEventListener("click", async () => {
+  deleteAction.classList.add("danger"); deleteAction.disabled = isOpen(session); deleteAction.addEventListener("click", () => run(async () => {
       if (session.hasBackup) await prepareBackupAccess();
       const decision = await confirmDeletion({ label: session.title, backupAvailable: !!session.hasBackup, beforeDeleteBackup: requestBackupAccess });
-      if (decision.confirmed) run(async () => {
+      if (decision.confirmed) {
         const result = await request("delete", { id, deleteBackup: decision.deleteBackup });
-        if (result.backupWarning) alert(`The conversation was deleted, but its backup remains.\n\n${result.backupWarning}`);
+        if (result.backupWarning) await showMessageDialog({ title: "Backup file was kept",
+          message: `The conversation was deleted, but its backup remains.\n\n${result.backupWarning}` });
         location.href = "transcripts.html";
-      });
-    });
+      }
+    }));
   $("#blocks").replaceChildren();
   if (!selectionTools.parentNode) $("#blocks").before(selectionTools);
   let previous, group, groupIndex = -1;
@@ -109,7 +110,8 @@ function selectedText() {
 }
 selectAll.addEventListener("change", () => {
   selectedBlocks = selectAll.checked ? new Set([...document.querySelectorAll(".speaker-turn")].map((_, i) => i)) : new Set();
-  render();
+  document.querySelectorAll(".speaker-check").forEach((check, index) => { check.checked = selectedBlocks.has(index); });
+  updateSelection();
 });
 copySelected.addEventListener("click", () => run(async () => {
   const text = selectedText(), count = selectedBlocks.size;

@@ -5,7 +5,8 @@ const vm = require('node:vm');
 
 async function meet(preferences, language = 'en', faults = {}) {
   let captions = false, notices = 0, enabled = 0, disabled = 0, onChange;
-  const saved = [], writes = [], intervals = [];
+  const saved = [], writes = [], intervals = [], timers = new Map();
+  let nextTimer = 0;
   let captionRows = [];
   const element = () => ({ dataset: {}, events: {}, setAttribute() {}, addEventListener(name, fn) { this.events[name] = fn; } });
   const overlay = Object.fromEntries(['host', 'panel', 'handle', 'status', 'toggle', 'stop', 'history'].map(key => [key, element()]));
@@ -24,6 +25,7 @@ async function meet(preferences, language = 'en', faults = {}) {
       runtime: { getManifest: () => ({ version: '1.4.0' }), sendMessage: async message => {
         if (message.type === 'create') saved.push(message.session);
         if (['create', 'save'].includes(message.type)) writes.push(message.session);
+        if (message.type === 'save' && faults.saveGate) await faults.saveGate;
         return { ok: true, value: message.type === 'beginCall' ? { callId: 'call' } : undefined };
       } },
     },
@@ -36,7 +38,7 @@ async function meet(preferences, language = 'en', faults = {}) {
     MeetChatNotice: class { constructor() { this.warning = ''; } send() { notices++; } },
     MeetCaptionParser: class { constructor() { this.blocks = []; this.blocked = new Set(); } boundary() {} update() { return false; } },
     MutationObserver: class { observe() {} },
-    setInterval(fn) { intervals.push(fn); }, setTimeout() {}, clearTimeout() {},
+    setInterval(fn) { intervals.push(fn); }, setTimeout(fn) { timers.set(++nextTimer, fn); return nextTimer; }, clearTimeout(id) { timers.delete(id); },
     structuredClone, crypto: require('node:crypto').webcrypto, console,
   });
   vm.runInContext(fs.readFileSync('content/meet-adapter.js', 'utf8'), context);
@@ -48,6 +50,8 @@ async function meet(preferences, language = 'en', faults = {}) {
   const settle = () => new Promise(resolve => setImmediate(resolve));
   return { overlay, saved, writes, rows(value) { captionRows = value; }, notices: () => notices, enabled: () => enabled, captions: () => captions, disabled: () => disabled,
     turnOffCaptions() { captions = false; },
+    async flushSaves() { const work = [...timers.values()]; timers.clear(); work.forEach(fn => fn()); await settle(); },
+    async heartbeat() { intervals[1](); await settle(); },
     async scan() { intervals[0](); await settle(); },
     async click(name) { await overlay[name].events.click(); await settle(); },
     change(key, value) { onChange({ [key]: { newValue: value } }, 'local'); },
@@ -185,4 +189,43 @@ test('recording indicator turns green after resume while stale paused rows remai
   await page.click('stop');
   assert.equal(page.overlay.panel.dataset.state, 'stopped');
   assert.deepEqual(page.writes.at(-1).blocks.map(block => block.text), ['Before pause', 'After resume']);
+});
+
+
+test('slow storage coalesces caption snapshots and does not accumulate heartbeats', async () => {
+  let release;
+  const faults = {};
+  const page = await meet({ announceRecording: false }, 'en', faults);
+  await page.scan();
+  faults.saveGate = new Promise(resolve => { release = resolve; });
+  page.rows([{ id: 'row', speaker: 'Alice', text: 'First words' }]);
+  await page.scan(); await page.flushSaves();
+  for (let n = 0; n < 20; n++) {
+    page.rows([{ id: 'row', speaker: 'Alice', text: `First words revision ${n}` }]);
+    await page.scan(); await page.flushSaves(); await page.heartbeat();
+  }
+  assert.equal(page.writes.length, 2, 'only initial creation and one in-flight caption snapshot');
+  release(); delete faults.saveGate;
+  await new Promise(resolve => setImmediate(resolve));
+  await page.flushSaves();
+  assert.equal(page.writes.length, 3, 'one latest snapshot replaces all intermediate changes');
+  assert.equal(page.writes.at(-1).blocks.at(-1).text, 'First words revision 19');
+});
+
+
+test('Stop preserves the final caption snapshot while an earlier save is blocked', async () => {
+  let release;
+  const faults = {};
+  const page = await meet({ announceRecording: false }, 'en', faults);
+  await page.scan();
+  faults.saveGate = new Promise(resolve => { release = resolve; });
+  page.rows([{ id: 'row', speaker: 'Alice', text: 'First words' }]);
+  await page.scan(); await page.flushSaves();
+  page.rows([{ id: 'row', speaker: 'Alice', text: 'First words and the final sentence' }]);
+  await page.scan();
+  const stopped = page.click('stop');
+  release(); delete faults.saveGate;
+  await stopped;
+  assert.equal(page.writes.at(-1).status, 'completed');
+  assert.equal(page.writes.at(-1).blocks.at(-1).text, 'First words and the final sentence');
 });

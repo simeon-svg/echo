@@ -33,12 +33,10 @@ export function notify(message, kind = "success") {
   notifications.append(toast);
 }
 const iconPaths = {
-  more: "M5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
   copy: "M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z",
   delete: "M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zm2-10h8v10H8zm7-6-1-1h-4L9 3H4v2h16V3z",
   download: "M11 3h2v9l3-3 1.4 1.4L12 16l-5.4-5.6L8 9l3 3zM5 18h14v3H5z",
   edit: "m3 17.3 11-11 3.7 3.7-11 11H3zm13-13 1.7-1.7a1 1 0 0 1 1.4 0L21.4 5a1 1 0 0 1 0 1.4L19.7 8z",
-  check: "m9 16.2-4.2-4.2L3.4 13.4 9 19l12-12-1.4-1.4z",
 };
 export function iconButton(label, name) {
   const button = node("button", undefined, "icon-button");
@@ -162,29 +160,3 @@ export function confirmMerge({ count, backupAvailable = false, beforeDeleteBacku
     dialog.showModal();
   });
 }
-export function actionMenu(label, actions) {
-  const details = node("details", undefined, "action-menu");
-  const summary = node("summary", undefined, "icon-button");
-  summary.setAttribute("aria-label", label); summary.title = label;
-  summary.append(iconButton(label, "more").firstChild);
-  const popover = node("div", undefined, "menu-popover");
-  for (const action of actions) {
-    const button = iconButton(action.label, action.icon);
-    button.className = `menu-item${action.danger ? " danger" : ""}`;
-    button.append(node("span", action.label)); button.disabled = !!action.disabled;
-    if (action.disabled) button.title = "Stop recording first";
-    button.addEventListener("click", () => { details.open = false; action.run(); });
-    popover.append(button);
-  }
-  details.append(summary, popover);
-  details.addEventListener("toggle", () => {
-    if (details.open) document.querySelectorAll("details.action-menu[open]").forEach(other => { if (other !== details) other.open = false; });
-  });
-  return details;
-}
-document.addEventListener("pointerdown", event => {
-  document.querySelectorAll("details.action-menu[open]").forEach(menu => { if (!menu.contains(event.target)) menu.open = false; });
-});
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape") document.querySelectorAll("details.action-menu[open]").forEach(menu => { menu.open = false; menu.querySelector("summary").focus(); });
-});

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.8 — 2026-09-30
+
+- Index transcripts by call, tab, and recording status instead of loading the entire history for saves, single-call reads, and recovery.
+- Migrate older transcripts without changing their call identities or backup metadata; report blocked database upgrades and close outdated connections.
+- Make multi-segment merge, rename, and deletion atomic; reject stale bulk selections and malformed transcript snapshots.
+- Advance backup versions when titles or call grouping change, and restore missing recovery alarms on worker startup.
+- Coalesce caption saves while storage is slow and avoid accumulating redundant heartbeat snapshots.
+- Show errors from deletion and merge preparation; keep bulk actions tied to the confirmed selection and use Echo's dialog for retained-backup warnings.
+- Avoid rebuilding speaker sections for Select all, skip unnecessary caption/account-name reads and empty-query text searches.
+- Remove the obsolete investigation script, unused menu code, and superseded CSS rules.
+
 ## 1.5.7 — 2026-09-30
 
 - Replace the extension icon with an abstract radial soundwave in vivid coral orange.

@@ -25,7 +25,7 @@ class Element {
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   click() { return this.fire('click'); }
 }
-async function page() {
+async function page(options = {}) {
   const nodes = new Map();
   const query = selector => { if (!nodes.has(selector)) nodes.set(selector, new Element('div')); return nodes.get(selector); };
   const fixture = { title: 'Test', status: 'completed', startTime: 1, endTime: 10, participants: ['Alice', 'Bob'], blocks: [
@@ -34,6 +34,8 @@ async function page() {
     { id: 3, speaker: 'Bob', timestamp: 3, text: 'Exclude this reply.' },
     { id: 4, speaker: 'Alice', timestamp: 4, text: 'Last reply.' },
   ] };
+  fixture.hasBackup = !!options.backup;
+  const notices = [];
   let copied = '', downloaded;
   const document = { querySelector: query, querySelectorAll: selector => query('#blocks').querySelectorAll(selector),
     createElement: tag => new Element(tag), body: new Element('body') };
@@ -41,14 +43,15 @@ async function page() {
     URL: { createObjectURL: blob => { downloaded = blob; return 'blob:test'; }, revokeObjectURL() {} },
     navigator: { clipboard: { writeText: async text => { copied = text; } } },
     request: async () => structuredClone(fixture), time: String, date: String, minutes: () => 1,
-    plainText: () => '', isOpen: () => false, statusDot: () => null, notify() {},
+    plainText: () => '', isOpen: () => false, statusDot: () => null, notify: message => notices.push(message),
+    prepareBackupAccess: async () => { if (options.permissionError) throw new Error(options.permissionError); },
     node: (tag, text, className) => new Element(tag, text, className),
     iconButton: label => { const b = new Element('button'); b.setAttribute('aria-label', label); return b; },
     setInterval() {}, setTimeout() {}, console,
   });
   vm.runInContext(fs.readFileSync('pages/transcript.js', 'utf8').replace(/^import .*;\n/gm, ''), context);
   await new Promise(resolve => setImmediate(resolve));
-  return { context, query, copied: () => copied, downloaded: () => downloaded,
+  return { context, query, notices, copied: () => copied, downloaded: () => downloaded,
     turns: () => query('#blocks').querySelectorAll('.speaker-turn'),
     execute: code => vm.runInContext(code, context) };
 }
@@ -85,4 +88,19 @@ test('selection survives render and can be cleared completely', async () => {
   await p.execute('selectAll.checked = false; selectAll.fire("change")');
   assert.equal(p.execute('selectedText()'), '');
   assert.equal(p.execute('copySelected.disabled && downloadSelected.disabled'), true);
+});
+
+
+test('Select all updates existing turns instead of rebuilding the transcript DOM', async () => {
+  const p = await page();
+  const before = p.turns();
+  await p.execute('selectAll.checked = true; selectAll.fire("change")');
+  assert.equal(p.turns()[0], before[0]);
+  assert.ok(p.turns().every(turn => turn.querySelector('input').checked));
+});
+
+test('backup preparation errors during deletion are shown to the user', async () => {
+  const p = await page({ backup: true, permissionError: 'Folder could not be read' });
+  await p.query('#actions').children[2].fire('click');
+  assert.deepEqual(p.notices, ['Folder could not be read']);
 });

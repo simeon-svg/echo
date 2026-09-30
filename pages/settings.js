@@ -27,7 +27,8 @@ async function saveAnnouncementMessage() {
   catch (error) { notify(error.message, "error"); }
 }
 async function refreshBackupStatus() {
-  const status = await request("backupFolderStatus");
+  const [status, handle] = await Promise.all([request("backupFolderStatus"), getBackupDirectory()]);
+  directoryHandle = handle;
   $("#backup-enabled").checked = status.enabled;
   $("#backup-controls").hidden = !status.enabled;
   $("#backup-status").textContent = !status.folderName ? "No folder selected."

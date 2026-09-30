@@ -22,8 +22,9 @@
   let call = null;
   let active = false, missingSince = 0, session = null, parser = null;
   let mode = "waiting", available = false, error = "", busy = false;
-  let enableAttempts = 0, enableAt = 0, saveTimer, scanTimer;
+  let enableAt = 0, saveTimer, scanTimer;
   let writeQueue = Promise.resolve();
+  let pendingWrites = 0, savingCaptions = false, captionsDirty = false;
   let durableId = null;
   let detectionProblem = "";
   async function send(message) {
@@ -57,18 +58,29 @@
     saveTimer = null;
     if (!session) return Promise.resolve();
     const snapshot = structuredClone(session);
+    pendingWrites++;
     writeQueue = writeQueue.catch(() => {}).then(async () => {
       await send({ type: durableId === snapshot.id ? "save" : "create", session: snapshot });
       durableId = snapshot.id;
     });
-    return writeQueue.then(() => { error = ""; render(); }, e => { error = e.message; render(); throw e; });
+    return writeQueue.then(() => { error = ""; render(); }, e => { error = e.message; render(); throw e; })
+      .finally(() => { pendingWrites--; });
   }
   function scheduleSave() {
-    if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; persist().catch(() => {}); }, 350);
+    captionsDirty = true;
+    if (saveTimer || savingCaptions) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null; captionsDirty = false; savingCaptions = true;
+      persist().catch(() => {}).finally(() => {
+        savingCaptions = false;
+        // Slow storage must not accumulate a queue of full transcript snapshots.
+        if (captionsDirty && mode === "recording") scheduleSave();
+      });
+    }, 350);
   }
-  function capture() {
+  function capture(visibleRows) {
     if (mode !== "recording" || !available || !parser || error) return;
-    if (parser.update(rows())) {
+    if (parser.update(visibleRows || rows())) {
       session.blocks = parser.blocks;
       session.participants = [...new Set(parser.blocks.map(b => b.speaker))];
       scheduleSave();
@@ -117,7 +129,7 @@
   toggle.addEventListener("click", () => action(async () => {
     if (mode === "stopped") {
       if (error) { await persist(); return; }
-      if (!available) { mode = "waiting"; enableAttempts = 0; enableAt = 0; scan(); return; }
+      if (!available) { mode = "waiting"; enableAt = 0; scan(); return; }
       await start();
     }
     else if (mode === "recording") {
@@ -125,7 +137,7 @@
       parser.boundary(rows());
       await persist();
     } else if (mode === "paused") {
-      parser.boundary(rows()); enableAttempts = 0; enableAt = 0;
+      parser.boundary(rows()); enableAt = 0;
       mode = "recording"; session.status = "recording"; scan(); await persist();
     }
   }));
@@ -140,7 +152,6 @@
         missingSince ||= Date.now();
         if (Date.now() - missingSince > 2500) {
           active = false; finish("meeting ended").catch(() => {});
-          enableAttempts = 0;
           notice = new MeetChatNotice();
           firstRecordingStarted = false;
           call = null;
@@ -159,14 +170,14 @@
     }
     if (host.hidden) host.hidden = false;
     available = meet.captionsEnabled() && !!meet.captionRegion();
-    if (available && rows().some(row => row.text.trim() && !row.speaker.trim())) available = false;
+    const visibleRows = available ? rows() : [];
+    if (visibleRows.some(row => row.text.trim() && !row.speaker.trim())) available = false;
     const enable = meet.captionButton() && !meet.captionsEnabled();
     if (enable && ["waiting", "recording"].includes(mode) && Date.now() - enableAt > 5000) {
-      enableAttempts++; enableAt = Date.now(); meet.setCaptionsEnabled(true);
+      enableAt = Date.now(); meet.setCaptionsEnabled(true);
     }
-    if (available) enableAttempts = 0;
     if (available && mode === "waiting" && !busy) action(start);
-    capture(); render();
+    capture(visibleRows); render();
   }
   function scan() {
     try { scanPage(); } catch (e) {
@@ -188,7 +199,9 @@
     finish("navigation").catch(() => {});
   });
   setInterval(scan, 1000);
-  setInterval(() => { if (session && ["recording", "paused"].includes(mode)) persist().catch(() => {}); }, 15000);
+  setInterval(() => {
+    if (session && !pendingWrites && ["recording", "paused"].includes(mode)) persist().catch(() => {});
+  }, 15000);
   scan();
   })().catch(e => {
     host.hidden = false; panel.dataset.state = "error";

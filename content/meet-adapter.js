@@ -49,12 +49,12 @@
   function captionRows() {
     const region = captionRegion();
     if (!region) return [];
-    const localName = currentUserName();
+    let localName;
     return [...region.querySelectorAll('.nMcdL')].map(row => {
       if (!ids.has(row)) ids.set(row, ++nextId);
       const speaker = row.querySelector('.NWpY1d')?.textContent || "";
       // Self-name resolution remains a localized fallback; preserve other names.
-      return { id: ids.get(row), speaker: ["You", "Вие"].includes(speaker.trim()) ? localName : speaker,
+      return { id: ids.get(row), speaker: ["You", "Вие"].includes(speaker.trim()) ? (localName ||= currentUserName()) : speaker,
         text: row.querySelector('.ygicle')?.textContent || "" };
     });
   }

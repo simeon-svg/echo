@@ -19,7 +19,7 @@ function selection() {
 async function run(work) { try { await work(); } catch (e) { message.textContent = ""; notify(e.message, "error"); } }
 function render() {
   const needle = search.value.trim().toLocaleLowerCase();
-  const matches = sessions.filter(s => [s.title, ...s.participants, ...s.blocks.map(b => b.text)].join(" ").toLocaleLowerCase().includes(needle));
+  const matches = !needle ? sessions : sessions.filter(s => [s.title, ...s.participants, ...s.blocks.map(b => b.text)].join(" ").toLocaleLowerCase().includes(needle));
   list.replaceChildren();
   for (const id of selected) if (!sessions.some(s => s.id === id)) selected.delete(id);
   message.textContent = matches.length ? "" : sessions.length ? "No matching calls." : "No calls yet. Join a Google Meet call to begin.";
@@ -41,15 +41,15 @@ function render() {
         const url = URL.createObjectURL(new Blob([plainText(s)], { type: "text/plain;charset=utf-8" }));
         const a = node("a"); a.href = url; a.download = `${s.title.replace(/[^a-z0-9\-_ ]/gi, "_")}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
       } },
-      { label: "Delete Call", icon: "delete", danger: true, disabled: isOpen(s), run: async () => {
+      { label: "Delete Call", icon: "delete", danger: true, disabled: isOpen(s), run: () => run(async () => {
         if (s.hasBackup) await prepareBackupAccess();
         const decision = await confirmDeletion({ label: s.title, backupAvailable: !!s.hasBackup, beforeDeleteBackup: requestBackupAccess });
-        if (decision.confirmed) run(async () => {
+        if (decision.confirmed) {
           const result = await request("delete", { id: s.id, deleteBackup: decision.deleteBackup });
           if (result.backupWarning) notify(`The conversation was deleted, but its backup remains: ${result.backupWarning}`, "error");
           selected.delete(s.id); await refresh();
-        });
-      } },
+        }
+      }) },
     ];
     const menu = node("div", undefined, "call-actions");
     for (const action of actions) {
@@ -89,32 +89,34 @@ async function refresh() {
     fingerprint = next; sessions = fresh; render();
   });
 }
-$("#merge").addEventListener("click", async () => {
+$("#merge").addEventListener("click", () => run(async () => {
   const chosen = sessions.filter(call => selected.has(call.id));
+  const ids = chosen.map(call => call.id);
   const backupAvailable = chosen.some(call => !!call.hasBackup);
   if (backupAvailable) await prepareBackupAccess();
   const decision = await confirmMerge({ count: chosen.length, backupAvailable, beforeDeleteBackups: requestBackupAccess });
-  if (decision.confirmed) run(async () => {
-    const result = await request("merge", { ids: [...selected], deleteBackups: decision.deleteBackups });
+  if (decision.confirmed) {
+    const result = await request("merge", { ids, deleteBackups: decision.deleteBackups });
     if (result.backupWarning) notify(`The conversations were merged, but some original backups remain:\n${result.backupWarning}`, "error");
     selected.clear(); await refresh();
-  });
-});
-$("#bulk-delete").addEventListener("click", async () => {
+  }
+}));
+$("#bulk-delete").addEventListener("click", () => run(async () => {
   const chosen = sessions.filter(call => selected.has(call.id));
+  const ids = chosen.map(call => call.id);
   const backupAvailable = chosen.some(call => !!call.hasBackup);
   if (backupAvailable) await prepareBackupAccess();
-  const decision = await confirmDeletion({ label: "", count: selected.size, backupAvailable, beforeDeleteBackup: requestBackupAccess });
-  if (decision.confirmed) run(async () => {
-    const result = await request("deleteMany", { ids: [...selected], deleteBackup: decision.deleteBackup });
+  const decision = await confirmDeletion({ label: "", count: ids.length, backupAvailable, beforeDeleteBackup: requestBackupAccess });
+  if (decision.confirmed) {
+    const result = await request("deleteMany", { ids, deleteBackup: decision.deleteBackup });
     if (result.backupWarning) notify(`The conversations were deleted, but some backups remain:\n${result.backupWarning}`, "error");
     selected.clear(); await refresh();
-  });
-});
+  }
+}));
 $("#clear-selection").addEventListener("click", () => { selected.clear(); render(); });
 search.addEventListener("input", render);
-window.addEventListener("focus", () => { if (!list.querySelector("details[open]")) refresh(); });
+window.addEventListener("focus", refresh);
 refresh();
 setInterval(() => {
-  if (!document.hidden && !list.contains(document.activeElement) && !list.querySelector("details[open]")) refresh();
+  if (!document.hidden && !list.contains(document.activeElement)) refresh();
 }, 5000);

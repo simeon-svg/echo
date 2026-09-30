@@ -133,6 +133,14 @@ Run the test suite with:
 node --test tests/*.test.cjs
 ```
 
+To check IndexedDB migration and transaction rollback in a real browser, run
+`python3 -m http.server 8769 --bind 127.0.0.1` from this directory and open
+`http://127.0.0.1:8769/tests/storage-browser.html`. It uses a separate local test
+database, preserves extension data, and reports each check on the page.
+
+The architecture review and validation limits are recorded in
+[`docs/architecture-review.md`](docs/architecture-review.md).
+
 The main areas are:
 
 - `content/meet.js` — Meet integration, recording lifecycle, and session creation.

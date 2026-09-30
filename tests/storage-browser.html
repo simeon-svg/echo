@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Echo storage checks</title>
+<h1>Echo storage checks</h1>
+<p>Uses a separate test database on this local origin. Extension transcripts are untouched.</p>
+<pre id="results">Running…</pre>
+<script type="module">
+const results = document.querySelector('#results');
+const checks = [];
+const assert = (condition, message) => { if (!condition) throw new Error(message); checks.push(`PASS ${message}`); };
+const request = operation => new Promise((resolve, reject) => {
+  const r = operation(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+});
+try {
+  await request(() => indexedDB.deleteDatabase('echo-storage-test'));
+  const legacy = await new Promise((resolve, reject) => {
+    const r = indexedDB.open('echo-storage-test', 2);
+    r.onupgradeneeded = () => {
+      r.result.createObjectStore('sessions', { keyPath: 'id' });
+      r.result.createObjectStore('backupState', { keyPath: 'key' });
+    };
+    r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+  });
+  await new Promise((resolve, reject) => {
+    const tx = legacy.transaction(['sessions', 'backupState'], 'readwrite');
+    tx.objectStore('sessions').put({ id: 'legacy', tabId: 7, status: 'completed', title: 'Kept legacy transcript' });
+    tx.objectStore('sessions').put({ id: 'segment', callId: 'existing-call', tabId: 8, status: 'paused' });
+    tx.objectStore('backupState').put({ key: 'call:legacy', callId: 'legacy', filename: 'kept.txt' });
+    tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+  });
+  const source = (await (await fetch('../storage/storage.js')).text()).replace('"meet-transcripts"', '"echo-storage-test"');
+  const sourceURL = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  const storage = await import(sourceURL);
+  URL.revokeObjectURL(sourceURL);
+  let blocked = false;
+  try { await storage.allSessions(); } catch (error) { blocked = /Close other Echo pages/.test(error.message); }
+  assert(blocked, 'blocked migration gives an actionable error instead of hanging');
+  legacy.close();
+  assert((await storage.sessionsForCall('legacy'))[0].title === 'Kept legacy transcript', 'v2 legacy transcript survives migration and gains a call index');
+  assert((await storage.sessionsForCall('existing-call'))[0].id === 'segment', 'existing call identity survives migration');
+  assert((await storage.sessionsForTab(7))[0].id === 'legacy', 'tab index returns only matching transcripts');
+  assert((await storage.openSessions()).length === 1, 'recovery query excludes completed history');
+  assert((await storage.getBackupCallState('legacy')).filename === 'kept.txt', 'backup metadata survives migration');
+  await storage.saveSessions([{ id: 'a', tabId: 7, status: 'recording' }, { id: 'b', callId: 'a', tabId: 7, status: 'paused' }]);
+  assert((await storage.sessionsForCall('a')).length === 2, 'batch save indexes new segments together');
+  let rejected = false;
+  try { await storage.saveSessions([{ id: 'a', title: 'Must roll back' }, { id: 'bad', uncloneable: () => {} }]); }
+  catch { rejected = true; }
+  assert(rejected && !(await storage.getSession('a')).title && !(await storage.getSession('bad')), 'synchronous clone failure rolls back the entire batch');
+  rejected = false;
+  try { await storage.query('readwrite', store => { store.delete('a'); store.add({ id: 'b' }); }); }
+  catch { rejected = true; }
+  assert(rejected && !!(await storage.getSession('a')), 'asynchronous duplicate-key failure rolls back earlier deletion');
+  await storage.deleteSessions(['a', 'b']);
+  assert(!(await storage.getSession('a')) && !(await storage.getSession('b')), 'batch delete removes all selected segments');
+  const upgrade = await request(() => indexedDB.open('echo-storage-test', 4));
+  assert(upgrade.version === 4, 'versionchange closes the cached connection so another page can upgrade');
+  upgrade.close();
+  await request(() => indexedDB.deleteDatabase('echo-storage-test'));
+  results.textContent = `${checks.join('\n')}\n\n${checks.length} checks passed.`;
+  document.title = 'PASS — Echo storage checks';
+} catch (error) {
+  results.textContent = `${checks.join('\n')}\nFAIL ${error.stack}`;
+  document.title = 'FAIL — Echo storage checks';
+}
+</script>
+</html>
