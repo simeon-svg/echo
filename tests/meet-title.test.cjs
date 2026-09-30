@@ -32,8 +32,9 @@ test('new unnamed meetings use a date-at-time title and the account name for You
     title: 'Meet — Meet', body: new Element(),
     querySelector(selector) { return selector.includes('Captions') ? region : null; },
     querySelectorAll(selector) {
-      if (selector === 'button[aria-label]') return [leave, captionsButton];
+      if (selector === 'button') return [leave, captionsButton];
       if (selector === '[aria-label]') return [account];
+      if (selector === '[role="region"][aria-label="Captions"]') return [region];
       return [];
     },
     addEventListener() {},
@@ -67,6 +68,7 @@ test('new unnamed meetings use a date-at-time title and the account name for You
     },
     Element,
   });
+  vm.runInContext(fs.readFileSync('content/meet-adapter.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('content/meet.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));

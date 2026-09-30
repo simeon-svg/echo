@@ -1,10 +1,7 @@
 (() => {
   "use strict";
   const NOTICE = "Quick heads-up: I'm saving a text transcript of this call using Meet's live captions, just for my notes. It stays on my device; no audio or video is recorded.";
-  const visible = el => el && el.getClientRects().length > 0;
-  const input = () => [...document.querySelectorAll('textarea[aria-label="Send a message"]')].find(visible);
-  const button = label => [...document.querySelectorAll('button[aria-label]')]
-    .find(el => el.getAttribute("aria-label") === label && visible(el));
+  const input = () => MeetAdapter.chatInput();
   const waitFor = async (predicate, active) => {
     for (let n = 0; n < 30; n++) {
       if (!active()) throw new Error("Call ended before the chat notice was sent.");
@@ -21,7 +18,7 @@
       let field;
       try {
         if (!input()) {
-          const open = button("Chat with everyone");
+          const open = MeetAdapter.chatButton();
           if (!open) throw new Error("Meeting chat is unavailable. Please announce the transcript manually.");
           open.click();
         }
@@ -31,7 +28,7 @@
         setter.call(field, this.message);
         field.dispatchEvent(new Event("input", { bubbles: true }));
         const send = await waitFor(() => {
-          const el = button("Send a message");
+          const el = MeetAdapter.chatSendButton();
           return el && !el.disabled && el.getAttribute("aria-disabled") !== "true" ? el : null;
         }, active);
         // A user's edit while waiting must never be sent by the extension.

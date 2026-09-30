@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-function setup(draft = '') {
+function setup(draft = '', language = 'en') {
   let sent = 0;
   class Textarea {
     get value() { return this.current || ''; }
@@ -12,10 +12,12 @@ function setup(draft = '') {
   }
   const field = new Textarea(); field.value = draft;
   const body = { innerText: '' };
-  const send = { disabled: false, getClientRects: () => [1], getAttribute: name => name === 'aria-label' ? 'Send a message' : null,
-    click() { sent++; body.innerText = field.value; field.value = ''; } };
+  const send = { disabled: false, getClientRects: () => [1], getAttribute: name => name === 'aria-label' ? (language === 'bg' ? 'Изпратете съобщение' : 'Send a message') : name === 'jsname' && language === 'bg' ? 'SoqoBf' : null,
+    querySelectorAll: () => language === 'bg' ? [{ textContent: 'send' }] : [], click() { sent++; body.innerText = field.value; field.value = ''; } };
   const context = vm.createContext({ HTMLTextAreaElement: Textarea, Event: class {}, setTimeout,
-    document: { body, querySelectorAll: selector => selector.startsWith('textarea') ? [field] : [send] } });
+    getComputedStyle: () => ({ visibility: 'visible' }),
+    document: { body, querySelectorAll: selector => selector === (language === 'bg' ? 'textarea[jsname="YPqjbf"]' : 'textarea[aria-label="Send a message"]') ? [field] : selector === 'button' ? [send] : [] } });
+  vm.runInContext(fs.readFileSync('content/meet-adapter.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('content/chat.js', 'utf8'), context);
   return { context, notice: vm.runInContext('new MeetChatNotice()', context), field, count: () => sent, message: () => body.innerText };
 }
@@ -47,4 +49,20 @@ test('notice sends the user-customized message', async () => {
   assert.equal(t.count(), 1);
   assert.equal(t.message(), 'Custom announcement');
   assert.equal(t.field.value, '');
+});
+
+test('Bulgarian chat sends once through technical selectors', async () => {
+  const t = setup('', 'bg');
+  await t.notice.send(() => true, () => {});
+  await t.notice.send(() => true, () => {});
+  assert.equal(t.count(), 1);
+  assert.equal(t.notice.warning, '');
+});
+
+test('Bulgarian chat preserves an existing user draft', async () => {
+  const t = setup('Моята чернова', 'bg');
+  await t.notice.send(() => true, () => {});
+  assert.equal(t.count(), 0);
+  assert.equal(t.field.value, 'Моята чернова');
+  assert.match(t.notice.warning, /draft/);
 });

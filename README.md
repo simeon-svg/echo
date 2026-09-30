@@ -10,7 +10,7 @@ telemetry, or cloud synchronization.
 
 - Start recording automatically when joining a Meet call, or start it manually.
 - Capture regular Meet captions, including speaker names and timestamps.
-- Pause and resume recording. Paused speech is not saved.
+- Pause and resume recording without turning off Meet captions. Paused speech is not saved.
 - Stop a transcript and start a separate transcript in the same call.
 - Recover unfinished transcripts after a tab close, navigation, browser restart,
   or missed heartbeat.
@@ -18,8 +18,16 @@ telemetry, or cloud synchronization.
 ### Meet overlay
 
 - Show recording, paused, stopped, waiting, and local-save-error states.
+- Keep all controls visible in fixed positions; disable unavailable actions.
 - Provide Pause, Resume, Stop, Start New Transcript, and History controls.
-- Drag the overlay or move it with the keyboard.
+- Drag the overlay or move it with the keyboard. Dragging near a corner snaps
+  it to 20px from both edges; resizing preserves its distance from nearby edges.
+- Keep the widget visible while waiting for a meeting or when detection fails.
+  The notification button is always visible, with a count when messages are waiting.
+  Click it to expand toward the available space above or below and read or dismiss messages; controls stay
+  in place. Closing the panel preserves messages; each message has its own dismiss button.
+  Messages remain until dismissed or resolved, and dismissed active
+  problems stay closed until the condition changes or resolves and recurs.
 
 ### Transcripts
 
@@ -57,11 +65,21 @@ telemetry, or cloud synchronization.
 After changing source files, click the extension's **Reload** button and reload
 the Meet tab.
 
+Check the installed version in `chrome://extensions`. Reload the extension and
+the Meet tab after an update. Release changes are listed in `CHANGELOG.md`.
+
+If no widget appears at all, check that Echo is enabled in the Chrome profile
+used for the meeting and allowed on `meet.google.com`. Echo cannot display an
+error if Chrome has not injected its scripts, including when an organization
+blocks the extension. Embedded Meet frames outside a normal Meet tab have not
+been validated; open the meeting in its own `meet.google.com` tab.
+
 ## Use
 
 1. Open **Settings** from the calls listing page.
 2. Choose automatic or manual recording and whether to send the Meet chat notice.
-3. Join a Google Meet call with the interface in English.
+3. Join a Google Meet call. Echo detects Meet controls using technical DOM markers
+   rather than translated interface labels.
 4. Use the Echo overlay to control recording, or open **History** to manage calls.
 
 All settings are saved automatically on this device. Recording mode changes apply
@@ -90,12 +108,15 @@ started does not send a delayed notice.
 
 ## Limitations
 
-- Meet's English UI labels and DOM selectors are required. Other interface
-  languages are not supported.
+- Meet integration uses observed DOM markers and untranslated icon names, with
+  English labels as a fallback. Bulgarian DOM samples are covered by automated
+  tests; additional languages and future Meet UI changes need live validation.
 - Echo captures only the captions visible while recording. It cannot recover speech
   from before recording started or while captions were disabled.
 - Participants are the speakers captured in the transcript, not the full attendee
-  list. The local user's Google Account name replaces `You` when Meet exposes it.
+  list. `You` and Bulgarian `Вие` are normalized to `You`, or to the Google Account
+  name when Meet exposes the English account label. Other local-speaker labels
+  are preserved as shown by Meet.
 - Meeting titles come from the Meet page title. Unnamed new meetings use a
   `date at time` title; existing transcript titles are not changed.
 - Caption rows are reconstructed heuristically. Boundary changes or unusual caption
@@ -115,6 +136,7 @@ node --test tests/*.test.cjs
 The main areas are:
 
 - `content/meet.js` — Meet integration, recording lifecycle, and session creation.
+- `content/meet-adapter.js` — Meet DOM detection and controls, independent of UI labels.
 - `content/captions.js` — caption reconstruction and pause boundaries.
 - `content/overlay.js` — recording overlay.
 - `background/service-worker.js` — saving, recovery, and backup operations.
@@ -124,7 +146,7 @@ The main areas are:
 The extension's Meet integration depends on selectors such as:
 
 ```text
-[role="region"][aria-label="Captions"]
+[role="region"][jscontroller="KPn5nb"]
   .nMcdL          caption row
     .NWpY1d      speaker name
     .ygicle      caption text

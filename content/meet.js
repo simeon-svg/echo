@@ -1,5 +1,11 @@
-(async () => {
+(() => {
   "use strict";
+  const overlay = createMeetOverlay();
+  const { host, panel, handle, status, notify, toggle, stop, history, setButton, setProblem } = overlay;
+  host.hidden = false;
+  status.textContent = "Echo is loading";
+  toggle.disabled = true; stop.disabled = true;
+  return (async () => {
   const DEFAULT_ANNOUNCE_MESSAGE = "Quick heads-up: I'm saving a text transcript of this call using Meet's live captions, just for my notes. It stays on my device; no audio or video is recorded.";
   const settings = await chrome.storage.local.get({ autoStart: true, announceRecording: true, announceMessage: DEFAULT_ANNOUNCE_MESSAGE });
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -9,34 +15,8 @@
     }
     if (changes.announceMessage) settings.announceMessage = changes.announceMessage.newValue || DEFAULT_ANNOUNCE_MESSAGE;
   });
-  // Verified in real Meet, September 24, 2026. Update these selectors first.
-  const SELECTORS = { region: '[role="region"][aria-label="Captions"]',
-    row: '.nMcdL', speaker: '.NWpY1d', text: '.ygicle' };
-  const visible = el => el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
-  const controls = () => [...document.querySelectorAll('button[aria-label]')].filter(visible);
-  const named = (buttons, name) => buttons.find(b => b.getAttribute("aria-label") === name);
-  function currentUserName() {
-    const label = [...document.querySelectorAll('[aria-label]')]
-      .map(element => element.getAttribute("aria-label")?.trim())
-      .find(value => /^(?:Google )?Account:\s*/i.test(value || ""));
-    if (!label) return "You";
-    const name = label.replace(/^(?:Google )?Account:\s*/i, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
-    return name && !name.includes("@") ? name : "You";
-  }
-  const ids = new WeakMap();
-  let nextId = 0;
-  function rows() {
-    const region = document.querySelector(SELECTORS.region);
-    if (!visible(region)) return [];
-    const localName = currentUserName();
-    return [...region.querySelectorAll(SELECTORS.row)].map(el => {
-      if (!ids.has(el)) ids.set(el, ++nextId);
-      const speaker = el.querySelector(SELECTORS.speaker)?.textContent || "";
-      return { id: ids.get(el), speaker: speaker === "You" ? localName : speaker,
-        text: el.querySelector(SELECTORS.text)?.textContent || "" };
-    });
-  }
-  const { host, panel, handle, status, notify, toggle, stop, history, setButton } = createMeetOverlay();
+  const meet = MeetAdapter;
+  const rows = () => meet.captionRows();
   let notice = new MeetChatNotice();
   let firstRecordingStarted = false;
   let call = null;
@@ -45,14 +25,15 @@
   let enableAttempts = 0, enableAt = 0, saveTimer, scanTimer;
   let writeQueue = Promise.resolve();
   let durableId = null;
-  let lastError = "", lastWarning = "", captionWarning = false;
+  let detectionProblem = "";
   async function send(message) {
     const response = await chrome.runtime.sendMessage(message);
     if (!response?.ok) throw new Error(response?.error || "Extension connection lost");
     return response.value;
   }
   function render() {
-    const text = error ? "Transcript unavailable — local save failed"
+    const text = detectionProblem ? "Transcript unavailable — Meet could not be detected"
+      : error ? "Transcript unavailable — local save failed"
       : mode === "stopped" ? (session ? "Transcript stopped" : "Ready to record — start manually")
       : mode === "paused" ? "Transcript paused"
       : !available ? "Transcript unavailable — captions could not be detected"
@@ -60,19 +41,16 @@
     if (status.textContent !== text) status.textContent = text;
     handle.title = `${text} · Drag to move`;
     handle.setAttribute("aria-label", `${text}. Drag or use arrow keys to move.`);
-    panel.dataset.state = error ? "error" : mode === "paused" ? "paused" : mode === "stopped" ? "stopped"
-      : available && mode === "recording" && !parser?.blocked.size ? "recording" : "waiting";
-    if (error && error !== lastError) notify(error, "error");
-    if (notice.warning && notice.warning !== lastWarning) notify(notice.warning, "error");
-    lastError = error; lastWarning = notice.warning;
-    const unavailable = active && !available && enableAttempts >= 3 && mode !== "paused" && mode !== "stopped";
-    if (unavailable && !captionWarning) notify("Recording unavailable — captions could not be detected.", "error");
-    captionWarning = unavailable;
+    setProblem?.(detectionProblem || (error ? "Your transcript could not be saved. Reload Echo and this Meet tab, then try again." : "") || notice.warning ||
+      (active && !available && !["paused", "stopped"].includes(mode) ?
+        (!meet.captionButton() ? "Echo cannot find the captions button. Try turning on captions in Meet yourself."
+          : "Waiting for captions. Make sure captions are turned on in Meet.") : ""));
+    panel.dataset.state = detectionProblem || error ? "error" : mode === "paused" ? "paused" : mode === "stopped" ? "stopped"
+      : available && mode === "recording" ? "recording" : "waiting";
     const label = mode === "stopped" ? (error ? "Retry Save" : "Start recording segment") : mode === "paused" ? "Resume" : "Pause";
     setButton(toggle, label, mode === "stopped" ? (error ? "retry" : "play") : mode === "paused" ? "play" : "pause");
-    toggle.disabled = busy || mode === "waiting" || (!!error && mode !== "stopped");
-    stop.hidden = mode === "stopped" || mode === "waiting";
-    stop.disabled = busy;
+    toggle.disabled = !!detectionProblem || !active || busy || mode === "waiting" || (!!error && mode !== "stopped");
+    stop.disabled = busy || !active || !session || !["recording", "paused"].includes(mode);
   }
   function persist() {
     clearTimeout(saveTimer);
@@ -96,11 +74,6 @@
       scheduleSave();
     }
   }
-  function freshCaptions() {
-    // Reset cumulative rows at privacy boundaries; surviving old rows stay blocked.
-    const off = named(controls(), "Turn off captions");
-    if (off) { available = false; enableAttempts = 0; enableAt = 0; off.click(); }
-  }
   async function start() {
     if (!active || !available) return;
     call ||= await send({ type: "beginCall" });
@@ -118,7 +91,6 @@
       date: new Date(startTime).toISOString(), startTime, endTime: null, duration: 0,
       participants: [], blocks: [], status: "recording" };
     mode = "recording"; error = "";
-    if (restarting) freshCaptions();
     await persist(); capture(); render();
     notify("Transcript recording started. Saved locally on this device.");
     if (!firstRecordingStarted) {
@@ -151,21 +123,19 @@
     else if (mode === "recording") {
       capture(); mode = "paused"; session.status = "paused";
       parser.boundary(rows());
-      // Disable Meet captions during Pause as well as blocking parser input.
-      // This prevents its cumulative row from collecting paused speech.
-      const off = named(controls(), "Turn off captions");
-      if (off) off.click();
       await persist();
     } else if (mode === "paused") {
-      parser.boundary(rows()); freshCaptions(); mode = "recording"; session.status = "recording"; await persist();
+      parser.boundary(rows()); enableAttempts = 0; enableAt = 0;
+      mode = "recording"; session.status = "recording"; scan(); await persist();
     }
   }));
   stop.addEventListener("click", () => action(() => finish()));
   history.addEventListener("click", () => send({ type: "history" }).catch(e => { error = e.message; render(); }));
-  function scan() {
-    const buttons = controls();
-    const inCall = !!named(buttons, "Leave call");
+  function scanPage() {
+    const inCall = meet.isInCall();
     if (!inCall) {
+      available = false;
+      detectionProblem = "Join a meeting to start recording. If you have already joined, reload this tab so Echo can reconnect.";
       if (active) {
         missingSince ||= Date.now();
         if (Date.now() - missingSince > 2500) {
@@ -176,31 +146,40 @@
           call = null;
         }
       }
-      host.hidden = !session;
+      if (host.hidden) host.hidden = false;
+      render();
       return;
     }
+    detectionProblem = "";
     missingSince = 0;
     if (!active) {
       active = true;
       session = null;
       mode = settings.autoStart ? "waiting" : "stopped";
     }
-    host.hidden = false;
-    available = !!named(buttons, "Turn off captions") && visible(document.querySelector(SELECTORS.region));
+    if (host.hidden) host.hidden = false;
+    available = meet.captionsEnabled() && !!meet.captionRegion();
     if (available && rows().some(row => row.text.trim() && !row.speaker.trim())) available = false;
-    const enable = named(buttons, "Turn on captions");
-    if (enable && ["waiting", "recording"].includes(mode) && enableAttempts < 3 && Date.now() - enableAt > 5000) {
-      enableAttempts++; enableAt = Date.now(); enable.click();
+    const enable = meet.captionButton() && !meet.captionsEnabled();
+    if (enable && ["waiting", "recording"].includes(mode) && Date.now() - enableAt > 5000) {
+      enableAttempts++; enableAt = Date.now(); meet.setCaptionsEnabled(true);
     }
     if (available) enableAttempts = 0;
     if (available && mode === "waiting" && !busy) action(start);
     capture(); render();
   }
+  function scan() {
+    try { scanPage(); } catch (e) {
+      available = false;
+      detectionProblem = "Echo cannot read this meeting right now. Reload the Meet tab and try again.";
+      render();
+    }
+  }
   new MutationObserver(() => {
     if (!scanTimer) scanTimer = setTimeout(() => { scanTimer = null; scan(); }, 100);
-  }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-label"] });
+  }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "aria-pressed", "class", "hidden", "style", "jsname", "jscontroller"] });
   document.addEventListener("click", event => {
-    if (event.target instanceof Element && event.target.closest('button[aria-label="Leave call"]')) finish("left meeting").catch(() => {});
+    if (event.target instanceof Element && meet.isLeaveTarget(event.target)) finish("left meeting").catch(() => {});
   }, true);
   window.addEventListener("pagehide", () => {
     if (!session || mode === "stopped") return;
@@ -211,4 +190,11 @@
   setInterval(scan, 1000);
   setInterval(() => { if (session && ["recording", "paused"].includes(mode)) persist().catch(() => {}); }, 15000);
   scan();
+  })().catch(e => {
+    host.hidden = false; panel.dataset.state = "error";
+    status.textContent = "Echo could not start";
+    handle.title = "Echo could not start. Reload the extension and this Meet tab.";
+    toggle.disabled = true; stop.disabled = true;
+    setProblem?.("Echo could not start. Reload the extension and this Meet tab, then try again.");
+  });
 })();

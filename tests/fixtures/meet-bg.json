@@ -1,0 +1,74 @@
+{
+  "leave": {
+    "attributes": {
+      "jsname": "CQylAd",
+      "aria-label": "Напускане на обаждането",
+      "role": "button"
+    },
+    "icons": [
+      "call_end"
+    ]
+  },
+  "captions": {
+    "attributes": {
+      "jsname": "RrG0hf",
+      "aria-label": "Изключване на надписите",
+      "role": "button"
+    },
+    "icons": [
+      "closed_caption"
+    ]
+  },
+  "chat": {
+    "attributes": {
+      "jsname": "A5il2e",
+      "aria-label": "Разговор в чат с всички",
+      "role": "button",
+      "aria-controls": "ME4pNd",
+      "data-panel-id": "2"
+    },
+    "icons": [
+      "chat",
+      "chat_bubble"
+    ]
+  },
+  "region": {
+    "attributes": {
+      "role": "region",
+      "aria-label": "Надписи",
+      "jscontroller": "KPn5nb"
+    },
+    "structure": [
+      {
+        "tag": "DIV",
+        "class": "nMcdL bj4p3b gBdnfe    UVSzeb",
+        "jsname": null
+      },
+      {
+        "tag": "DIV",
+        "class": "adE6rb",
+        "jsname": null
+      },
+      {
+        "tag": "IMG",
+        "class": "Z6byG r6DyN",
+        "jsname": null
+      },
+      {
+        "tag": "DIV",
+        "class": "KcIKyf jxFHg ",
+        "jsname": null
+      },
+      {
+        "tag": "SPAN",
+        "class": "NWpY1d",
+        "jsname": null
+      },
+      {
+        "tag": "DIV",
+        "class": "ygicle VbkSUe",
+        "jsname": null
+      }
+    ]
+  }
+}
