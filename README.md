@@ -10,16 +10,16 @@ telemetry, or cloud synchronization.
 
 - Start recording automatically when joining a Meet call, or start it manually.
 - Capture regular Meet captions, including speaker names and timestamps.
-- Pause and resume recording without turning off Meet captions. Paused speech is not saved.
-- Stop a transcript and start a separate transcript in the same call.
+- Stop to finalize a transcript; starting again in the same call creates a separate history entry.
+- Leave Meet captions enabled when stopping; speech between recordings is not saved.
 - Recover unfinished transcripts after a tab close, navigation, browser restart,
   or missed heartbeat.
 
 ### Meet overlay
 
-- Show recording, paused, stopped, waiting, and local-save-error states.
+- Show recording, stopped, waiting, and local-save-error states.
 - Keep all controls visible in fixed positions; disable unavailable actions.
-- Provide Pause, Resume, Stop, Start New Transcript, and History controls.
+- Use one recording button: green to start, red to stop, alongside bookmarks, History and notifications.
 - Drag the overlay or move it with the keyboard. Dragging near a corner snaps
   it to 20px from both edges; resizing preserves its distance from nearby edges.
 - Keep the widget visible while waiting for a meeting or when detection fails.
@@ -29,12 +29,31 @@ telemetry, or cloud synchronization.
   Messages remain until dismissed or resolved, and dismissed active
   problems stay closed until the condition changes or resolves and recurs.
 
+### Bookmarks and personal notes
+
+- Click the bookmark icon while recording to mark the current moment immediately.
+- Saving a bookmark does not open a text field. Click Add Note to write one.
+  The confirmation hides after five seconds unless focused; an opened note stays visible.
+  Note text saves automatically in Meet; Done closes it after saving.
+- Opening notifications hides the note panel; reopening it preserves the note.
+  Use the top-right close button to dismiss it. The bookmark icon fills briefly after saving.
+- Escape or Ctrl/Cmd+Enter closes a saved Meet note.
+- Add one bookmark to a speaker section without opening the note editor; repeated marks reuse it.
+- Transcript bookmarks have an Add Note button. Notes can be edited; the bookmark’s
+  delete button removes both the marker and its note. Save note and Cancel apply to
+  the text editor.
+- Keep highlighted notes beside their replies and show bookmark/note counts in call history.
+- Label personal text as `AUTHOR NOTE` in copied transcripts, TXT downloads,
+  selected speaker sections and automatic backups. Empty markers export as `BOOKMARK`.
+
 ### Transcripts
 
 - Browse all saved calls from the extension toolbar or the overlay's History button.
-- Search titles, speaker names, and transcript text.
+- Search titles, speaker names, transcript text, and personal notes.
 - Rename, copy, download as UTF-8 TXT, or delete transcripts.
 - Merge multiple transcripts into a new conversation.
+- Mark new recordings from the same Meet call with a subtle indicator and merge them with one click after recording stops.
+- Suggest possible matches for older recordings using Meet links, nearby times, and shared participants or tab identity; review and choose the entries before merging. Original backup files are kept.
 - Keep transcripts indefinitely; Echo does not automatically delete them.
 
 ### Meet chat announcement
@@ -44,6 +63,9 @@ telemetry, or cloud synchronization.
 - Edit the notice text in Settings; the custom message is saved on this device.
 - Do not replace an existing chat draft or use a messaging API.
 - Ask you to announce the transcript manually when chat is unavailable.
+- Support both the original Meet chat and the embedded Google Chat composer.
+  The embedded composer requires site access to `chat.google.com`; its helper
+  runs only in embedded spaces and accepts announcement requests from Meet.
 
 ### Automatic backups
 
@@ -68,6 +90,15 @@ the Meet tab.
 Check the installed version in `chrome://extensions`. Reload the extension and
 the Meet tab after an update. Release changes are listed in `CHANGELOG.md`.
 
+Enable **Allow in incognito** on Echo's extension details page to use it there.
+The toolbar icon and Meet **History** open Echo in the same window. Conversations
+and settings are shared with regular windows, and incognito recordings remain
+in your local history after all incognito windows close. Echo sends incognito
+history operations to its regular worker, which owns the existing durable
+IndexedDB database; no history migration is needed. Backup folder selection
+and permission prompts open regular Echo Settings, while granted backups work
+for recordings from either window type.
+
 If no widget appears at all, check that Echo is enabled in the Chrome profile
 used for the meeting and allowed on `meet.google.com`. Echo cannot display an
 error if Chrome has not injected its scripts, including when an organization
@@ -82,9 +113,22 @@ been validated; open the meeting in its own `meet.google.com` tab.
    rather than translated interface labels.
 4. Use the Echo overlay to control recording, or open **History** to manage calls.
 
+**Include an AI prompt with transcripts** adds an editable prompt before copied
+transcripts and downloaded TXT files, including individual speaker sections and
+selections. Enable it in Settings to show the prompt field, prefilled with an
+English meeting-summary prompt. The option is off by default, and prompts are
+never included in automatic backups.
+
 All settings are saved automatically on this device. Recording mode changes apply
 when joining the next call. In manual mode, captions are enabled only after you
 press Play.
+
+Set **Your name** in Settings to label your own replies in call pages and TXT
+exports, including older replies saved as “You”. Leave it blank to use the name
+captured from Meet or “You”. Older recordings saved under an actual name without
+self identity cannot be safely relabeled. Changing this setting does not rewrite
+backup files or change recording timestamps. Any backup created or rewritten
+later (including after a title or note edit) uses the current name.
 
 The first recording in a call can send this notice:
 
@@ -105,6 +149,27 @@ started does not send a delayed notice.
   can read them.
 - If Chrome asks for folder access again, choose **Allow on every visit**.
 - Permission-blocked backup writes stay queued and are retried after access returns.
+
+## Reporting a problem
+
+Before reloading a failing Meet tab, open the bell in the Echo widget and click
+**Download diagnostics**. Send the resulting `echo-diagnostics-….json` file with
+a short description of what you expected, what happened, and the steps to repeat it.
+Include a screenshot of the widget if useful.
+
+The report includes the injected Echo version, Chromium version, platform and
+language, recording state, detected control counts, save health, and up to 100
+recent state/error events. It contains no transcript text, participant names,
+meeting title/URL, custom announcement text, raw DOM, or raw error messages.
+Diagnostics stay in the current tab's memory, reset on reload, and are downloaded
+only when requested. Nothing is uploaded automatically. The download remains
+available if settings loading or recording startup fails.
+
+If the widget is entirely absent, Echo's scripts may not have been injected and
+cannot produce a tab report. Include the installed version from
+`chrome://extensions`, whether Echo is enabled in that Chrome profile, and whether
+the meeting is in a separate tab or an embedded frame. See
+[`docs/diagnostics.md`](docs/diagnostics.md) for report-field details.
 
 ## Limitations
 
@@ -145,7 +210,7 @@ The main areas are:
 
 - `content/meet.js` — Meet integration, recording lifecycle, and session creation.
 - `content/meet-adapter.js` — Meet DOM detection and controls, independent of UI labels.
-- `content/captions.js` — caption reconstruction and pause boundaries.
+- `content/captions.js` — caption reconstruction and recording boundaries.
 - `content/overlay.js` — recording overlay.
 - `background/service-worker.js` — saving, recovery, and backup operations.
 - `storage/` — IndexedDB storage and backup state.

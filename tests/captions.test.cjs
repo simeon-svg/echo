@@ -62,3 +62,14 @@ test('speech intentionally repeated after Resume is kept in a fresh row', () => 
   p.update([row('Repeated phrase after resume', 2)], 3);
   assert.equal(p.blocks[1].text, 'Repeated phrase after resume');
 });
+
+
+test('self identity survives caption revisions, pauses and another speaker with the same name', () => {
+  const p = new CaptionParser();
+  p.update([{ id: 1, speaker: 'Alex', isSelf: true, text: 'First' }], 1000);
+  p.update([{ id: 1, speaker: 'Alex', isSelf: true, text: 'First sentence' }], 1200);
+  p.update([{ id: 1, speaker: 'Alex', isSelf: true, text: 'First sentence next' }], 6200);
+  p.update([{ id: 1, speaker: 'Alex', isSelf: false, text: 'Someone else' }], 6300);
+  assert.deepEqual(p.blocks.map(b => b.isSelf), [true, true, false]);
+  assert.deepEqual(p.blocks.map(b => b.text), ['First sentence', 'next', 'Someone else']);
+});

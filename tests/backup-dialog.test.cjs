@@ -23,7 +23,7 @@ test('merge requests backup permission from the Merge button user gesture', asyn
       addEventListener() {}, querySelectorAll: () => [] },
     setTimeout, clearTimeout, Date,
   });
-  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/export /g, ''), context);
+  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''), context);
   let activeGesture = false, permissionRequests = 0;
   const resultPromise = context.confirmMerge({
     count: 2, backupAvailable: true,
@@ -54,7 +54,7 @@ test('prepared backup access restores a prompt-state handle from the confirmatio
   };
   const context = vm.createContext({ getBackupDirectory: async () => handle });
   const source = fs.readFileSync('pages/backup-access.js', 'utf8')
-    .replace(/^import .*;\n/gm, '').replace(/export /g, '') +
+    .replace(/^import .*;\n/gm, '').replace(/^import .*;\n/gm, '').replace(/export /g, '') +
     '\nglobalThis.backupAccess = { prepareBackupAccess, requestBackupAccess };';
   vm.runInContext(source, context);
   await context.backupAccess.prepareBackupAccess();
@@ -82,7 +82,7 @@ test('a permission-required backup indicator is an actionable button', async () 
     document: { createElement: tag => new Element(tag), createElementNS: (_namespace, tag) => new Element(tag), addEventListener() {} },
     setTimeout, clearTimeout, Date,
   });
-  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/export /g, ''), context);
+  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''), context);
   let grants = 0;
   const dot = context.backupStatusDot({ status: 'permission-required', error: 'Folder access required' }, () => { grants++; });
   assert.equal(dot.tagName, 'BUTTON');
@@ -112,7 +112,7 @@ test('Echo confirmation dialogs resolve from their own styled controls', async (
     document: { body, createElement: tag => new Element(tag), createElementNS: (_namespace, tag) => new Element(tag), addEventListener() {} },
     setTimeout, clearTimeout, Date,
   });
-  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/export /g, ''), context);
+  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''), context);
   const resultPromise = context.confirmAction({
     title: 'Back up existing conversations?', message: 'Echo can process them now.',
     confirmLabel: 'Back up now', cancelLabel: 'Only future conversations',
@@ -146,7 +146,7 @@ test('Echo message dialogs replace native alerts with one styled acknowledgement
       createElementNS: (_namespace, tag) => new Element(tag), addEventListener() {} },
     setTimeout, clearTimeout, Date,
   });
-  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/export /g, ''), context);
+  vm.runInContext(fs.readFileSync('pages/shared.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''), context);
   const closed = context.showMessageDialog({
     title: 'Backup file was kept', message: 'The local conversation was deleted, but its TXT backup remains.',
   });
@@ -154,4 +154,19 @@ test('Echo message dialogs replace native alerts with one styled acknowledgement
   assert.deepEqual(buttons.map(button => button.textContent), ['OK']);
   await buttons[0].fire('click');
   await closed;
+});
+
+test('incognito backup deletion uses shared permission or opens regular Settings', async () => {
+  for (const permission of ['granted', 'prompt']) {
+    const requests = [];
+    const context = vm.createContext({ chrome: { extension: { inIncognitoContext: true } },
+      getBackupDirectory: async () => { throw new Error('Must not read temporary incognito handles'); },
+      request: async type => { requests.push(type); return { permission }; },
+    });
+    vm.runInContext(fs.readFileSync('pages/backup-access.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, '') + '\nglobalThis.access = { prepareBackupAccess, requestBackupAccess };', context);
+    await context.access.prepareBackupAccess();
+    if (permission === 'granted') assert.equal(await context.access.requestBackupAccess(), true);
+    else await assert.rejects(context.access.requestBackupAccess(), /regular Echo Settings/);
+    assert.equal(requests.includes('openRegularSettings'), permission !== 'granted');
+  }
 });

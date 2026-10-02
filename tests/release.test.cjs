@@ -7,3 +7,8 @@ test('the latest changelog release matches the version Chrome installs', () => {
   const latest = fs.readFileSync('CHANGELOG.md', 'utf8').match(/^## (\d+\.\d+\.\d+)/m)?.[1];
   assert.equal(latest, manifest.version);
 });
+
+test('incognito extension pages can load in their own top-level incognito tab', () => {
+  const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+  assert.equal(manifest.incognito, 'split');
+});

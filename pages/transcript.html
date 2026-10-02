@@ -1,11 +1,18 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Call</title><link rel="stylesheet" href="../styles/app.css"></head>
-<body><main class="app-shell detail-page"><nav class="shell-nav"><a class="back" href="transcripts.html">← All calls</a><span class="shell-label">Echo</span></nav>
+<body><main class="app-shell detail-page">
+<header class="page-heading call-page-heading"><div class="title-area"><div class="title-display"><h1 id="heading">Call</h1><span id="edit-action"></span></div>
+<form id="rename" hidden><input id="title" aria-label="Call title" maxlength="300" required autocomplete="off"></form>
+<p id="meta" class="muted"></p></div><div class="listing-header-actions"><a class="back" href="transcripts.html">← All calls</a><button id="notifications-toggle" class="settings-icon notifications-toggle" type="button" aria-label="Notifications" title="Notifications" aria-controls="notifications-panel" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="notifications-badge" class="notifications-badge" hidden></span></button><a class="settings-link settings-icon" href="settings.html" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.43 12.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.49.49 0 0 0-.61.22l-2 3.46a.49.49 0 0 0 .12.64l2.11 1.65c-.04.32-.07.66-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.38.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.24.42.49.42h4c.25 0 .45-.18.49-.42l.38-2.65c.61-.25 1.17-.58 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></a></div></header>
 <p id="message" role="status">Loading…</p><section id="detail" hidden>
-<div class="call-summary"><header class="detail-heading"><div class="title-area"><div class="title-display"><h1 id="heading"></h1><span id="edit-action"></span></div>
-<form id="rename" hidden><input id="title" aria-label="Call title" maxlength="300" required autocomplete="off"></form></div>
-<div id="actions" class="actions"></div></header>
-<p id="meta" class="muted"></p><p id="participants" class="muted"></p>
-</div><article id="blocks" aria-label="Conversation"></article></section></main>
+<div id="timeline-start" aria-hidden="true"></div>
+<nav id="timeline" class="transcript-map" aria-label="Conversation timeline"></nav>
+<div id="timeline-spacer" aria-hidden="true"></div>
+<article id="blocks" aria-label="Conversation"></article></section></main>
+<aside id="notifications-panel" class="notifications-panel" aria-labelledby="notifications-heading" hidden>
+<header class="notifications-heading"><h2 id="notifications-heading">Notifications</h2><button id="notifications-close" type="button" aria-label="Close notifications">×</button></header>
+<div class="notifications-tools"><span class="muted">Activity and merge suggestions</span><button id="notifications-clear" type="button">Clear activity</button></div>
+<div id="notifications-feed" class="notifications-feed"></div></aside>
+<div id="notifications-status" class="visually-hidden" role="status" aria-live="polite"></div>
 <script type="module" src="transcript.js"></script></body></html>

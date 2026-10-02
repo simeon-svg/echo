@@ -6,25 +6,38 @@
   const unique = elements => elements.length === 1 ? elements[0] : null;
   const buttons = () => [...document.querySelectorAll('button')].filter(visible);
   const icons = el => [...el.querySelectorAll('.google-symbols.notranslate')].map(icon => icon.textContent.trim());
-  function control(match, labels) {
+  function candidates(match, labels) {
     const all = buttons();
     const technical = all.filter(match);
     // Ambiguity must not fall through to a translated label and cause a click.
-    if (technical.length) return unique(technical);
-    return unique(all.filter(el => labels.includes(el.getAttribute("aria-label"))));
+    if (technical.length) return technical;
+    return all.filter(el => labels.includes(el.getAttribute("aria-label")));
   }
-  const leaveButton = () => control(el => el.getAttribute("jsname") === "CQylAd" || icons(el).includes("call_end"), ["Leave call"]);
-  const captionButton = () => control(el => el.getAttribute("jsname") === "RrG0hf" || icons(el).includes("closed_caption"), ["Turn on captions", "Turn off captions"]);
-  const chatButton = () => control(el => el.getAttribute("data-panel-id") === "2" && ["chat", "chat_bubble"].some(icon => icons(el).includes(icon)), ["Chat with everyone"]);
-  function captionRegion() {
+  const controls = {
+    leave: [el => el.getAttribute("jsname") === "CQylAd" || icons(el).includes("call_end"), ["Leave call"]],
+    captions: [el => el.getAttribute("jsname") === "RrG0hf" || icons(el).includes("closed_caption"), ["Turn on captions", "Turn off captions"]],
+    chat: [el => el.getAttribute("data-panel-id") === "2" && ["chat", "chat_bubble"].some(icon => icons(el).includes(icon)), ["Chat with everyone"]],
+    chatSend: [el => (el.getAttribute("jsname") === "SoqoBf" && icons(el).includes("send")) || el.getAttribute("jsname") === "GBTyxb", ["Send a message", "Send message"]],
+  };
+  const control = key => unique(candidates(...controls[key]));
+  const leaveButton = () => control("leave");
+  const captionButton = () => control("captions");
+  const chatButton = () => control("chat");
+  function regionCandidates() {
     const regions = [...document.querySelectorAll('[role="region"][jscontroller="KPn5nb"]')].filter(visible);
-    if (regions.length) return unique(regions);
+    if (regions.length) return regions;
     // Structural fallback works once the first caption row has appeared.
     const parents = [...new Set([...document.querySelectorAll('.nMcdL')]
       .filter(row => row.querySelector('.NWpY1d') && row.querySelector('.ygicle'))
       .map(row => row.closest('[role="region"]')).filter(visible))];
-    if (parents.length) return unique(parents);
-    return unique([...document.querySelectorAll('[role="region"][aria-label="Captions"]')].filter(visible));
+    if (parents.length) return parents;
+    return [...document.querySelectorAll('[role="region"][aria-label="Captions"]')].filter(visible);
+  }
+  const captionRegion = () => unique(regionCandidates());
+  function inputCandidates() {
+    const editors = [...document.querySelectorAll('[contenteditable="true"][role="textbox"][jsname="yrriRe"]')].filter(visible);
+    const fields = [...document.querySelectorAll('textarea[jsname="YPqjbf"]')].filter(visible);
+    return [...editors, ...(fields.length ? fields : [...document.querySelectorAll('textarea[aria-label="Send a message"]')].filter(visible))];
   }
   function captionsEnabled() {
     const button = captionButton();
@@ -53,8 +66,9 @@
     return [...region.querySelectorAll('.nMcdL')].map(row => {
       if (!ids.has(row)) ids.set(row, ++nextId);
       const speaker = row.querySelector('.NWpY1d')?.textContent || "";
-      // Self-name resolution remains a localized fallback; preserve other names.
-      return { id: ids.get(row), speaker: ["You", "Вие"].includes(speaker.trim()) ? (localName ||= currentUserName()) : speaker,
+      // Keep self identity even when the account name can be resolved.
+      const isSelf = ["You", "Вие"].includes(speaker.trim());
+      return { id: ids.get(row), isSelf, speaker: isSelf ? (localName ||= currentUserName()) : speaker,
         text: row.querySelector('.ygicle')?.textContent || "" };
     });
   }
@@ -70,11 +84,12 @@
       if (!button || captionsEnabled() === enabled || button.disabled || button.getAttribute("aria-disabled") === "true") return false;
       button.click(); return true;
     },
-    chatInput() {
-      const fields = [...document.querySelectorAll('textarea[jsname="YPqjbf"]')].filter(visible);
-      if (fields.length) return unique(fields);
-      return unique([...document.querySelectorAll('textarea[aria-label="Send a message"]')].filter(visible));
+    chatInput: () => unique(inputCandidates()),
+    chatSendButton: () => control("chatSend"),
+    diagnostics() {
+      const summary = list => ({ found: list.length === 1, candidates: list.length });
+      return { ...Object.fromEntries(Object.entries(controls).map(([key, definition]) => [key, summary(candidates(...definition))])),
+        chatInput: summary(inputCandidates()), captionRegion: summary(regionCandidates()) };
     },
-    chatSendButton: () => control(el => el.getAttribute("jsname") === "SoqoBf" && icons(el).includes("send"), ["Send a message"]),
   };
 })();

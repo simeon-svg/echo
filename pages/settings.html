@@ -1,15 +1,26 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Echo settings</title><link rel="stylesheet" href="../styles/app.css"></head>
-<body><main class="app-shell">
-<nav class="shell-nav"><a class="back" href="transcripts.html">← All calls</a></nav>
-<header class="page-heading"><div><h1>Settings</h1><p class="muted">Your preferences, saved on this device.</p></div></header>
+<body><main class="app-shell settings-page">
+<header class="page-heading"><div><h1>Settings</h1><p class="muted">Your preferences, saved on this device.</p></div><div class="listing-header-actions"><a class="back" href="transcripts.html">← All calls</a><button id="notifications-toggle" class="settings-icon notifications-toggle" type="button" aria-label="Notifications" title="Notifications" aria-controls="notifications-panel" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="notifications-badge" class="notifications-badge" hidden></span></button><a class="settings-link settings-icon" href="settings.html" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.43 12.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.49.49 0 0 0-.61.22l-2 3.46a.49.49 0 0 0 .12.64l2.11 1.65c-.04.32-.07.66-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.38.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.24.42.49.42h4c.25 0 .45-.18.49-.42l.38-2.65c.61-.25 1.17-.58 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></a></div></header>
 <form id="settings" class="call-summary settings-form">
+<div class="setting-row personal-name-heading">
+  <span><strong>Your name</strong><span id="display-name-help" class="muted">Shown for your replies in saved calls and TXT exports. Leave blank to use the name detected in Meet or “You”. Changing this does not rewrite backups; new or rewritten backups use your current name.</span></span>
+</div>
+<div class="settings-subcontrol personal-name-setting">
+  <label for="display-name">Name shown in transcripts</label>
+  <input id="display-name" type="text" maxlength="100" placeholder="e.g. Simeon" autocomplete="name" aria-describedby="display-name-help" disabled>
+</div>
 <label class="setting-row" for="auto-start"><span><strong>Start recording automatically</strong><span class="muted">Start when you join a Meet call. When off, use the play button in the Echo panel. Applies to your next call.</span></span><input id="auto-start" type="checkbox" disabled></label>
 <label class="setting-row" for="announce-recording"><span><strong>Announce recording in chat</strong><span class="muted">Automatically send a heads-up when the first recording starts in a call. Turning this on later will not send a message for an already started recording.</span></span><input id="announce-recording" type="checkbox" disabled></label>
 <div id="announce-message-controls" class="settings-subcontrol" hidden>
   <label for="announce-message">Message sent to Meet chat</label>
   <textarea id="announce-message" rows="3" maxlength="500"></textarea>
+</div>
+<label class="setting-row" for="include-ai-prompt"><span><strong>Include an AI prompt with transcripts</strong><span id="ai-prompt-help" class="muted">Add your prompt before every copied or downloaded transcript, including selected sections. Prompts are never included in automatic backups.</span></span><input id="include-ai-prompt" type="checkbox" disabled></label>
+<div id="ai-prompt-controls" class="settings-subcontrol" hidden>
+  <label for="ai-prompt">AI prompt</label>
+  <textarea id="ai-prompt" rows="12" aria-describedby="ai-prompt-help" disabled></textarea>
 </div>
 <label class="setting-row" for="backup-enabled"><span><strong>Automatically back up conversations</strong><span class="muted">Save a readable TXT copy after each conversation ends. Backup files are not encrypted.</span></span><input id="backup-enabled" type="checkbox" disabled></label>
 <section id="backup-controls" class="backup-settings" hidden aria-labelledby="backup-heading">
@@ -22,5 +33,11 @@
   </div>
   <p class="backup-note muted">Echo creates <strong>Echo Backups</strong> inside the selected folder, organized into <code>YYYY-MM</code> folders. If Chrome asks again, choose <strong>Allow on every visit</strong> for persistent access. Disconnecting never deletes backup files.</p>
 </section>
+<div id="incognito-backup-controls" class="setting-actions" hidden><button id="manage-backup-regular" type="button">Manage backup folder in a regular window</button></div>
 <p class="settings-note muted">All settings on this page save automatically.</p>
-</form></main><script type="module" src="settings.js"></script></body></html>
+</form></main><aside id="notifications-panel" class="notifications-panel" aria-labelledby="notifications-heading" hidden>
+<header class="notifications-heading"><h2 id="notifications-heading">Notifications</h2><button id="notifications-close" type="button" aria-label="Close notifications">×</button></header>
+<div class="notifications-tools"><span class="muted">Activity and merge suggestions</span><button id="notifications-clear" type="button">Clear activity</button></div>
+<div id="notifications-feed" class="notifications-feed"></div></aside>
+<div id="notifications-status" class="visually-hidden" role="status" aria-live="polite"></div>
+<script type="module" src="settings.js"></script></body></html>

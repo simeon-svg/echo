@@ -46,3 +46,23 @@ This investigation verifies the enabled state and caption structure, not a full
 end-to-end run of the updated extension. The Mac locked before the live toggle
 and recording checks. Other locales' local-speaker aliases and account-name
 resolution remain unverified.
+
+## Embedded Google Chat capture — October 1, 2026
+
+User-provided saved HTML shows the Chat panel hosting an iframe from
+`https://chat.google.com/u/<account>/embed/space/<space>?origin=https://meet.google.com`.
+The composer is `[contenteditable="true"][role="textbox"][jsname="yrriRe"]`;
+Send is `button[jsname="GBTyxb"]`. The existing top-frame textarea selectors
+cannot reach this cross-origin document and also do not match its editor.
+
+`content/chat-bridge.js` connects the Meet announcement to a content script
+restricted to embedded Chat space URLs. Both sides check message origins and
+window identity; the helper requires the Meet embed origin. Readiness probes
+can repeat while the editor loads, but a send request is never retried. The
+iframe uses the same draft, cancellation and confirmation checks as legacy
+chat. The rich-text editor uses native insertion to update the composer state.
+
+Regression tests cover the sanitized captured structure, communication between
+two frame contexts, delayed readiness, drafts, cancellation and sender checks.
+The saved HTML establishes the DOM and origin mismatch; a live Google Chat
+delivery after this change still needs confirmation in an actual meeting.

@@ -1,3 +1,4 @@
+import { transcriptBody } from "../storage/calls.js";
 export async function request(type, values = {}) {
   const result = await chrome.runtime.sendMessage({ type, ...values });
   if (!result?.ok) throw new Error(result?.error || "Cannot access local transcripts");
@@ -8,7 +9,7 @@ export const date = at => new Date(at).toLocaleDateString("en-US", { month: "lon
 export const minutes = s => Math.max(0, Math.round(((s.endTime || s.updatedAt || Date.now()) - s.startTime) / 60000));
 export function plainText(s) {
   return `${s.title}\n${date(s.startTime)}\n${time(s.startTime)}–${time(s.endTime || s.updatedAt)}\nDuration: ${minutes(s)} minutes\nStatus: ${s.status}\n\nParticipants:\n${s.participants.join("\n")}\n\n---\n\n` +
-    s.blocks.map(b => `${b.speaker} — ${time(b.timestamp)}\n${b.text}`).join("\n\n") + "\n";
+    transcriptBody(s, time) + "\n";
 }
 export function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -17,7 +18,10 @@ export function node(tag, text, className) {
   return el;
 }
 let notifications;
+let notificationHandler;
+export function setNotificationHandler(handler) { notificationHandler = handler; }
 export function notify(message, kind = "success") {
+  if (notificationHandler) { notificationHandler(message, kind); return; }
   if (!notifications) {
     notifications = node("div", undefined, "page-notifications");
     notifications.setAttribute("aria-label", "Notifications");
@@ -33,6 +37,8 @@ export function notify(message, kind = "success") {
   notifications.append(toast);
 }
 const iconPaths = {
+  chevron: "M6.7 8.3 12 13.6l5.3-5.3 1.4 1.4L12 16.4 5.3 9.7z",
+  bookmark: "M6 3h12v19l-6-4-6 4V3zm2 2v13l4-2.7 4 2.7V5z",
   copy: "M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z",
   delete: "M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zm2-10h8v10H8zm7-6-1-1h-4L9 3H4v2h16V3z",
   download: "M11 3h2v9l3-3 1.4 1.4L12 16l-5.4-5.6L8 9l3 3zM5 18h14v3H5z",
@@ -50,8 +56,8 @@ export const isOpen = s => ["recording", "paused"].includes(s.status);
 export const shortDate = at => new Date(at).toLocaleDateString("en-US", {
   month: "short", day: "numeric", ...(new Date(at).getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
 export function statusDot(status) {
-  if (status === "completed") return null;
-  const labels = { recording: "Recording", paused: "Paused", processing: "Processing", interrupted: "Interrupted — saved transcript recovered", failed: "Failed" };
+  if (["completed", "interrupted"].includes(status)) return null;
+  const labels = { recording: "Recording", paused: "Paused", processing: "Processing", failed: "Failed" };
   const el = node("span", undefined, `status-dot ${status}`);
   el.title = labels[status] || status; el.setAttribute("aria-label", el.title); el.setAttribute("role", "img");
   return el;

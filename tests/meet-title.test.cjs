@@ -56,7 +56,7 @@ test('new unnamed meetings use a date-at-time title and the account name for You
       } },
     },
     createMeetOverlay: () => ({ host: new Element(), panel: new Element(), handle: new Element(), status: new Element(),
-      toggle: overlayButton(), stop: overlayButton(), history: overlayButton(), notify() {}, setButton() {} }),
+      diagnostics: overlayButton(), toggle: overlayButton(), stop: overlayButton(), history: overlayButton(), notify() {}, setButton() {} }),
     MeetChatNotice: class { send() {} },
     MeetCaptionParser: class {
       constructor() { this.blocks = []; this.blocked = new Set(); }
@@ -69,6 +69,7 @@ test('new unnamed meetings use a date-at-time title and the account name for You
     Element,
   });
   vm.runInContext(fs.readFileSync('content/meet-adapter.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('content/diagnostics.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('content/meet.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));

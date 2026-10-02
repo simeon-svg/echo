@@ -22,7 +22,11 @@ Possible causes include a different DOM, a different Chrome profile, restricted
 site access, an organization extension policy, an embedded frame, or stale tab
 scripts after updating the extension. These are hypotheses, not a diagnosis.
 Echo's manifest currently injects into top-level `https://meet.google.com/*`
-pages; embedded frames are not explicitly enabled.
+pages. As of 1.13.3, a separate helper also runs in embedded Google Chat spaces
+to support Meet's cross-origin chat composer; it does not inject the recording
+widget or caption capture into those frames. The October 1 saved chat capture
+confirmed this specific announcement failure (see `meet-dom.md`). The earlier
+report of the entire widget being absent remains a separate investigation.
 
 Echo 1.4.0 creates its overlay before loading settings or detecting a meeting.
 Missing controls, scan exceptions, startup exceptions, unavailable captions,

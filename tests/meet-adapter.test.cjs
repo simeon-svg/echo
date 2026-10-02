@@ -96,3 +96,29 @@ test('localized chat input and send control ignore other textareas and ambiguous
   t.body.children.push(new Node('button', { jsname: 'SoqoBf' }, [new Node('i', { class: 'google-symbols notranslate' }, [], 'send')]));
   assert.equal(t.adapter.chatSendButton(), null);
 });
+
+
+test('diagnostics distinguish ambiguous controls without exporting their text or clicking them', () => {
+  const t = setup();
+  t.body.children.push(new Node('button', { jsname: 'CQylAd', 'aria-label': 'PRIVATE_LABEL' }, [], 'PRIVATE_TEXT'));
+  const report = t.adapter.diagnostics();
+  assert.equal(report.leave.candidates, 2);
+  assert.equal(report.leave.found, false);
+  assert.equal(report.captions.found, true);
+  assert.equal(t.leave.clicks, 0);
+  assert.equal(t.captions.clicks, 0);
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|Hello|Вие/);
+});
+
+
+test('self identity is preserved when Meet resolves the account name', () => {
+  const t = setup();
+  t.body.children.push(new Node('div', { 'aria-label': 'Google Account: Alex (alex@example.com)' }));
+  const own = t.adapter.captionRows()[0];
+  assert.equal(own.isSelf, true);
+  assert.equal(own.speaker, 'Alex');
+  t.row.children[0].textContent = 'Alex';
+  const other = t.adapter.captionRows()[0];
+  assert.equal(other.isSelf, false);
+  assert.equal(other.speaker, 'Alex');
+});

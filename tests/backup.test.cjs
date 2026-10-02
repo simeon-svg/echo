@@ -55,6 +55,7 @@ function setup(permission = 'granted') {
   const source = fs.readFileSync('storage/backup.js', 'utf8')
     .replace(/^import[\s\S]*?;\n/gm, '').replace(/export /g, '') +
     '\nglobalThis.backupApi = { monthOf, safeFileName, backupText, removeCallBackup, syncCalls, withBackupStatus };';
+  vm.runInContext(fs.readFileSync('storage/calls.js', 'utf8').replace(/export /g, ''), context);
   vm.runInContext(source, context);
   const call = { id: 'call-123', title: 'Weekly / Sync', startTime: new Date(2026, 8, 28, 10).getTime(),
     endTime: new Date(2026, 8, 28, 10, 30).getTime(), updatedAt: 200, status: 'completed', participants: ['Jane'],
@@ -131,4 +132,61 @@ test('a backup deletion waiting for permission remains queued and is retried aft
   assert.equal(t.states.has('call-123'), false);
   const files = t.root.directories.get('Echo Backups').directories.get('2026-09').files;
   assert.equal(files.size, 0);
+});
+
+
+test('automatic TXT backups retain explicit author-note labels and separate bookmark markers', () => {
+  const t = setup();
+  t.call.blocks[0].id = 1;
+  t.call.bookmarks = [
+    { id: 'note', blockId: 1, timestamp: t.call.startTime + 60000, text: 'Follow up\nTomorrow' },
+    { id: 'mark', blockId: null, timestamp: t.call.startTime, text: '' },
+  ];
+  const text = t.backupText(t.call);
+  assert.match(text, /\[AUTHOR NOTE — .*\]\n> Follow up\n> Tomorrow/);
+  assert.match(text, /\[BOOKMARK — /);
+  assert.ok(text.indexOf('[BOOKMARK') < text.indexOf('Jane —'));
+  assert.ok(text.indexOf('Hello') < text.indexOf('[AUTHOR NOTE'));
+});
+
+
+test('personal name changes update views without rewriting backups; later edits use the current name', async () => {
+  const t = setup();
+  t.call.participants = ['You', 'Jane'];
+  t.call.blocks.unshift({ speaker: 'You', timestamp: t.call.startTime, text: 'My reply' });
+  await t.syncCalls([t.call]);
+  const files = t.root.directories.get('Echo Backups').directories.get('2026-09').files;
+  const original = [...files.values()][0].contents;
+  const stateBefore = JSON.stringify(t.states.get(t.call.id));
+  t.preferences.displayName = 'Симеон';
+  const views = await t.withBackupStatus([t.call]);
+  assert.equal(views[0].blocks[0].speaker, 'Симеон');
+  assert.deepEqual(Array.from(views[0].participants), ['Симеон', 'Jane']);
+  assert.equal(views[0].backup.status, 'backed');
+  assert.equal(views[0].updatedAt, t.call.updatedAt);
+  assert.equal((await t.syncCalls([t.call])).backed, 0);
+  assert.equal([...files.values()][0].contents, original);
+  assert.equal(JSON.stringify(t.states.get(t.call.id)), stateBefore);
+  assert.equal(t.call.blocks[0].speaker, 'You');
+  await t.syncCalls([{ ...t.call, title: 'Renamed call', updatedAt: 300 }]);
+  assert.equal(files.size, 1);
+  assert.match([...files.values()][0].contents, /Симеон — .*\nMy reply/);
+  t.preferences.displayName = 'New name';
+  await t.syncCalls([{ ...t.call, updatedAt: 400, blocks: t.call.blocks.map(b => ({ ...b, text: b.text + ' edited' })) }]);
+  assert.match([...files.values()][0].contents, /New name — .*\nMy reply edited/);
+  t.preferences.displayName = 'Manual regeneration';
+  await t.syncCalls([t.call], { force: true });
+  assert.match([...files.values()][0].contents, /Manual regeneration —/);
+});
+
+test('personal names are used in views even when automatic backup is disabled', async () => {
+  const t = setup();
+  t.preferences.backupEnabled = false;
+  t.preferences.displayName = 'Me';
+  t.call.participants = ['You'];
+  t.call.blocks[0] = { ...t.call.blocks[0], speaker: 'You' };
+  const [view] = await t.withBackupStatus([t.call]);
+  assert.equal(view.blocks[0].speaker, 'Me');
+  assert.equal(view.participants[0], 'Me');
+  assert.equal(t.root.directories.size, 0);
 });

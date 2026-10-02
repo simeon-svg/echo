@@ -25,8 +25,8 @@
       this.blocked = new Set();
       this.next = 0;
     }
-    // Existing DOM rows may still include paused speech. Ignore them completely
-    // until Meet replaces/removes them; never guess a boundary inside paused text.
+    // Existing DOM rows may include speech from before recording. Ignore them completely
+    // until Meet replaces/removes them; never guess a boundary inside old text.
     boundary(rows) {
       this.rows.clear();
       this.blocked = new Set(rows.map(row => row.id));
@@ -42,14 +42,15 @@
         const speaker = clean(row.speaker || "");
         if (!text || !speaker || this.blocked.has(row.id)) continue;
         let state = this.rows.get(row.id);
-        if (state && state.raw === text && state.speaker === speaker) continue;
+        if (state && state.raw === text && state.speaker === speaker && state.isSelf === row.isSelf) continue;
         const makeBlock = value => {
-          const block = { id: ++this.next, speaker, timestamp: at, text: value };
+          const block = { id: ++this.next, speaker, timestamp: at, speechMs: 400, text: value };
+          if (typeof row.isSelf === "boolean") block.isSelf = row.isSelf;
           this.blocks.push(block);
           return block;
         };
-        if (!state || state.speaker !== speaker) {
-          state = { speaker, raw: text, prefix: "", carry: "", block: makeBlock(text), at };
+        if (!state || state.speaker !== speaker || state.isSelf !== row.isSelf) {
+          state = { speaker, isSelf: row.isSelf, raw: text, prefix: "", carry: "", block: makeBlock(text), at };
           this.rows.set(row.id, state);
         } else {
           const sameStart = common(state.raw, text);
@@ -77,6 +78,7 @@
             state.prefix = "";
             state.carry = "";
           }
+          if (state.block.timestamp !== at) state.block.speechMs += Math.min(4000, Math.max(0, at - state.at));
           state.raw = text;
           state.at = at;
         }

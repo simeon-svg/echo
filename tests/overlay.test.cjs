@@ -21,16 +21,31 @@ test('notification badge opens on demand, dismisses messages, and keeps its butt
   });
   vm.runInContext(fs.readFileSync('content/overlay.js', 'utf8'), context);
   const overlay = context.createMeetOverlay();
+  const bar = overlay.panel.children.find(item => item.className === 'bar');
+  assert.equal(bar.children.length, 5, 'handle, recording, bookmark, history, notifications');
+  assert.equal(bar.children[1], overlay.toggle);
+  assert.equal(overlay.stop, undefined);
+  assert.equal(overlay.toggle.className, 'recording-toggle');
+  assert.equal(overlay.toggle.getAttribute('aria-label'), 'Start recording');
+  const dot = overlay.toggle.children.find(item => item.className === 'dot');
+  assert.ok(dot);
+  assert.equal(dot.getAttribute('aria-hidden'), 'true');
+  assert.equal(overlay.handle.children.some(item => item.className === 'dot'), false);
+  overlay.setButton(overlay.toggle, 'Stop recording', 'stop');
+  assert.equal(overlay.toggle.children.at(-1), dot, 'the status dot survives recording changes');
+  overlay.setButton(overlay.toggle, 'Start recording', 'play');
+  assert.equal(overlay.toggle.children.at(-1), dot);
   const stack = overlay.panel.children.find(item => item.className === 'notifications');
   const count = () => overlay.notificationToggle.children[1].textContent;
   assert.equal(overlay.notificationToggle.hidden, false);
   overlay.notificationToggle.events.click();
   assert.equal(stack.hidden, false, 'the empty panel can be opened');
-  assert.equal(stack.children[1].hidden, false);
+  assert.equal(stack.children[1], overlay.diagnostics);
+  assert.equal(overlay.diagnostics.title, 'No transcript text or participant names. Attach this file to your bug report.');
   overlay.notificationToggle.events.click();
   overlay.setProblem('Please join a meeting');
   overlay.notify('Recording started');
-  assert.equal(stack.children[1].hidden, true);
+  assert.equal(stack.children[1], overlay.diagnostics, 'diagnostics remains available when messages exist');
   assert.equal(count(), '2');
   assert.equal(stack.hidden, true, 'new messages stay hidden until requested');
   assert.equal(overlay.notificationToggle.hidden, false);
@@ -44,7 +59,7 @@ test('notification badge opens on demand, dismisses messages, and keeps its butt
   assert.equal(count(), '2', 'outside clicks preserve messages');
   assert.equal(overlay.notificationToggle.attributes['aria-expanded'], 'false');
   overlay.notificationToggle.events.click();
-  stack.children[2].children[0].events.click();
+  stack.children.find(item => item.className === "notification").children[0].events.click();
   assert.equal(count(), '1');
   overlay.setProblem('Please join a meeting');
   assert.equal(count(), '1', 'polling must not reopen a dismissed condition');
@@ -94,7 +109,7 @@ function movableOverlay() {
     addEventListener(name, callback) { this.events[name] = callback; }
     setPointerCapture() {}
     getBoundingClientRect() {
-      return { width: 215, height: 48,
+      return { width: 158, height: 48,
         left: this.style.left ? parseFloat(this.style.left) : 20,
         top: this.style.top ? parseFloat(this.style.top) : context.innerHeight - 48 - 24 };
     }
@@ -119,8 +134,8 @@ function movableOverlay() {
 test('dragging near each corner snaps to 20px from both edges', () => {
   const page = movableOverlay();
   for (const [x, y, left, top] of [
-    [30, 35, 20, 20], [750, 30, 765, 20],
-    [25, 725, 20, 732], [750, 730, 765, 732],
+    [30, 35, 20, 20], [800, 30, 822, 20],
+    [25, 725, 20, 732], [800, 730, 822, 732],
   ]) {
     page.drag(x, y);
     const rect = page.overlay.host.getBoundingClientRect();
@@ -134,14 +149,14 @@ test('dragging near each corner snaps to 20px from both edges', () => {
 
 test('resize preserves bottom and right offsets, including after temporary clamping', () => {
   const page = movableOverlay();
-  page.drag(750, 730);
+  page.drag(800, 730);
   page.resize(700, 500);
-  assert.equal(page.overlay.host.getBoundingClientRect().left, 465);
+  assert.equal(page.overlay.host.getBoundingClientRect().left, 522);
   assert.equal(page.overlay.host.getBoundingClientRect().top, 432);
   page.resize(1000, 800);
-  assert.equal(page.overlay.host.getBoundingClientRect().left, 765);
+  assert.equal(page.overlay.host.getBoundingClientRect().left, 822);
   assert.equal(page.overlay.host.getBoundingClientRect().top, 732);
-  page.drag(600, 400); // 185px from right, 352px from bottom.
+  page.drag(600, 400); // 242px from right, 352px from bottom.
   page.resize(300, 200);
   assert.equal(page.overlay.host.getBoundingClientRect().left, 8);
   assert.equal(page.overlay.host.getBoundingClientRect().top, 8);
@@ -154,7 +169,7 @@ test('resize preserves bottom and right offsets, including after temporary clamp
 test('notifications use space below top corners and above bottom corners without moving controls', () => {
   const page = movableOverlay();
   page.overlay.notify('A pending message');
-  for (const x of [30, 750]) {
+  for (const x of [30, 800]) {
     page.drag(x, 30);
     const before = page.overlay.host.getBoundingClientRect();
     assert.equal(page.overlay.host.dataset.notificationDirection, 'below');

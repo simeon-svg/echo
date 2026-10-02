@@ -1,3 +1,4 @@
+import { transcriptBody, withDisplayName } from "./calls.js";
 import {
   allBackupStates,
   deleteBackupCallState,
@@ -28,7 +29,7 @@ const displayTime = at => new Date(at).toLocaleTimeString([], { hour: "2-digit",
 const minutes = call => Math.max(0, Math.round(((call.endTime || call.updatedAt || Date.now()) - call.startTime) / 60000));
 export function backupText(call) {
   return `${call.title}\nEcho ID: ${call.id}\n${displayDate(call.startTime)}\n${displayTime(call.startTime)}–${displayTime(call.endTime || call.updatedAt)}\nDuration: ${minutes(call)} minutes\nStatus: ${call.status}\n\nParticipants:\n${call.participants.join("\n")}\n\n---\n\n` +
-    call.blocks.map(block => `${block.speaker} — ${displayTime(block.timestamp)}\n${block.text}`).join("\n\n") + "\n";
+    transcriptBody(call, displayTime) + "\n";
 }
 
 async function writableDirectory() {
@@ -64,7 +65,8 @@ async function writeCall(call) {
     const file = await directory.getFileHandle(filename, { create: true });
     const writable = await file.createWritable();
     try {
-      await writable.write(backupText(call));
+      const { displayName = "" } = await chrome.storage.local.get({ displayName: "" });
+      await writable.write(backupText(withDisplayName(call, displayName)));
       await writable.close();
     } catch (error) {
       if (writable.abort) await writable.abort().catch(() => {});
@@ -186,7 +188,8 @@ async function retryPendingCleanup() {
 }
 export async function forgetCallBackup(id) { await deleteBackupCallState(id); }
 export async function withBackupStatus(calls) {
-  const { backupEnabled = false } = await chrome.storage.local.get({ backupEnabled: false });
+  const { backupEnabled = false, displayName = "" } = await chrome.storage.local.get({ backupEnabled: false, displayName: "" });
+  calls = calls.map(call => withDisplayName(call, displayName));
   const states = new Map((await allBackupStates()).map(state => [state.callId, state]));
   if (!backupEnabled) return calls.map(call => ({ ...call, hasBackup: !!states.get(call.id)?.filename }));
   return calls.map(call => {
