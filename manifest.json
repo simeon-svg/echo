@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Echo",
-  "version": "1.18.2",
+  "version": "1.18.3",
   "incognito": "split",
   "description": "Save Google Meet live captions as local transcripts.",
   "icons": {

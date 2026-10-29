@@ -27,7 +27,7 @@
   let meetingId = null;
   let active = false, missingSince = 0, session = null, parser = null;
   let mode = "stopped", available = false, error = "", busy = false;
-  let enableAt = 0, saveTimer, scanTimer;
+  let enableAt = 0, lastEnableStep = null, saveTimer, scanTimer;
   let writeQueue = Promise.resolve();
   let pendingWrites = 0, savingCaptions = false, captionsDirty = false;
   let durableId = null, finalizedId = null;
@@ -173,7 +173,7 @@
         mode = "stopped";
       } else if (mode === "stopped") {
         if (error) { await persist(); return; }
-        if (!available) { mode = "waiting"; enableAt = 0; scan(); return; }
+        if (!available) { mode = "waiting"; enableAt = 0; lastEnableStep = null; scan(); return; }
         await start();
       }
     });
@@ -225,9 +225,17 @@
     const visibleRows = available ? rows() : [];
     visibleRowCount = visibleRows.length;
     if (visibleRows.some(row => row.text.trim() && !row.speaker.trim())) available = false;
-    const enable = meet.captionButton() && !meet.captionsEnabled();
-    if (enable && ["waiting", "recording"].includes(mode) && Date.now() - enableAt > 5000) {
-      enableAt = Date.now(); meet.setCaptionsEnabled(true);
+    const captionControl = meet.captionButton();
+    const enable = captionControl && !meet.captionsEnabled();
+    const enableStep = captionControl?.getAttribute("aria-haspopup") === "dialog" ? "menu" : "toggle";
+    // Opening the menu and enabling live captions are different actions.
+    // Take the second step as soon as Meet renders it, retaining the cooldown
+    // for repeated attempts on the same step (including failed toggles).
+    const nextStep = lastEnableStep === "menu" && enableStep === "toggle";
+    if (enable && ["waiting", "recording"].includes(mode) && (nextStep || Date.now() - enableAt > 5000)) {
+      if (meet.setCaptionsEnabled(true)) {
+        enableAt = Date.now(); lastEnableStep = enableStep;
+      }
     }
     if (available && mode === "waiting" && !busy) action(start);
     updateCaptionGap(); capture(visibleRows); render();

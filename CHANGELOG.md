@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.3 — 2026-10-29
+
+- Enable live captions as soon as Meet renders the toggle after opening its captions menu, removing the five-second retry delay between these distinct actions.
+- Keep retry throttling for failed toggles and avoid closing a menu that is still loading.
+
 ## 1.18.2 — 2026-10-29
 
 - Recognize the new account-neutral Google Chat embed URL used in Meet, including the helper registration, so recording announcements can reach the embedded composer.

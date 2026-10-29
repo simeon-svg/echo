@@ -10,6 +10,7 @@ async function meet(preferences, language = 'en', faults = {}) {
   let now = Date.now();
   class ClockDate extends Date { static now() { return now; } }
   let captionRows = [];
+  let menuOpen = false, menuClicks = 0;
   const element = () => ({ dataset: {}, events: {}, setAttribute() {}, addEventListener(name, fn) { this.events[name] = fn; } });
   const overlay = Object.fromEntries(['host', 'panel', 'handle', 'status', 'toggle', 'history', 'diagnostics'].map(key => [key, element()]));
   overlay.notify = (message, kind) => notifications.push({ message, kind });
@@ -20,6 +21,14 @@ async function meet(preferences, language = 'en', faults = {}) {
     const translated = { 'Leave call': 'Напускане на обаждането', 'Turn off captions': 'Изключване на надписите', 'Turn on captions': 'Включване на надписите' };
     return { getClientRects: () => [1], getAttribute: key => key === 'aria-label' ? (language === 'bg' ? translated[label] : label) : key === 'jsname' && language === 'bg' ? names[label] : null, querySelectorAll: () => [], click };
   };
+  const menuButton = {
+    getClientRects: () => [1],
+    getAttribute: key => ({ 'aria-haspopup': 'dialog', 'aria-expanded': String(menuOpen) })[key] || null,
+    querySelectorAll: () => [{ textContent: 'translate_cc' }],
+    click() { menuOpen = !menuOpen; menuClicks++; },
+  };
+  const liveButton = button('Turn on captions', () => { captions = !faults.captionEnable; enabled++; });
+  liveButton.getAttribute = key => key === 'jsname' ? 'RrG0hf' : key === 'aria-label' ? (captions ? 'Turn off live captions' : 'Turn on live captions') : null;
   const region = { getClientRects: () => [1], querySelectorAll: () => [] };
   const context = vm.createContext({
     chrome: {
@@ -37,7 +46,7 @@ async function meet(preferences, language = 'en', faults = {}) {
     },
     Date: ClockDate, Blob, URL: { createObjectURL: blob => { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} },
     document: { documentElement: { append() {} }, createElement: () => ({ click() {}, remove() {} }), title: 'Meet — Test', body: {}, addEventListener() {}, querySelector: () => captions ? region : null,
-      querySelectorAll: selector => faults.controls ? [] : selector === (language === 'bg' ? '[role="region"][jscontroller="KPn5nb"]' : '[role="region"][aria-label="Captions"]') ? (captions ? [region] : []) : selector === 'button' ? [button('Leave call'), captions
+      querySelectorAll: selector => faults.controls ? [] : selector === (language === 'bg' ? '[role="region"][jscontroller="KPn5nb"]' : '[role="region"][aria-label="Captions"]') ? (captions ? [region] : []) : selector === 'button' && faults.captionMenu ? [button('Leave call'), menuButton, ...(menuOpen && !faults.menuLoading ? [liveButton] : [])] : selector === 'button' ? [button('Leave call'), captions
         ? button('Turn off captions', () => { captions = false; disabled++; })
         : button('Turn on captions', () => { captions = !faults.captionEnable; enabled++; })] : [] },
     window: { addEventListener() {} }, getComputedStyle: () => ({ visibility: 'visible' }),
@@ -56,7 +65,7 @@ async function meet(preferences, language = 'en', faults = {}) {
   vm.runInContext(fs.readFileSync('content/diagnostics.js', 'utf8'), context);
   await vm.runInContext(fs.readFileSync('content/meet.js', 'utf8'), context);
   const settle = () => new Promise(resolve => setImmediate(resolve));
-  return { overlay, saved, writes, downloads, messages, notifications, advance(milliseconds) { now += milliseconds; }, rows(value) { captionRows = value; }, notices: () => notices, enabled: () => enabled, captions: () => captions, disabled: () => disabled,
+  return { overlay, saved, writes, downloads, messages, notifications, advance(milliseconds) { now += milliseconds; }, rows(value) { captionRows = value; }, notices: () => notices, menuClicks: () => menuClicks, enabled: () => enabled, captions: () => captions, disabled: () => disabled,
     turnOffCaptions() { captions = false; },
     async flushSaves() { const work = [...timers.values()]; timers.clear(); work.forEach(fn => fn()); await settle(); },
     async heartbeat() { intervals[1](); await settle(); },
@@ -396,4 +405,33 @@ test('recordings persist self identity independently of the captured account nam
   await page.click('toggle');
   const last = page.writes.at(-1);
   assert.deepEqual(Array.from(last.blocks, b => b.isSelf), [true, false]);
+});
+
+
+test('new caption menu activates live captions on the next scan without the retry delay', async () => {
+  const page = await meet({}, 'en', { captionMenu: true });
+  assert.equal(page.menuClicks(), 1);
+  assert.equal(page.enabled(), 0);
+  page.advance(100);
+  await page.scan();
+  assert.equal(page.enabled(), 1);
+  page.advance(100);
+  await page.scan();
+  assert.equal(page.saved.length, 1);
+  assert.equal(page.menuClicks(), 1);
+});
+
+test('fast menu activation still throttles failed toggles and never closes a loading menu', async () => {
+  const faults = { captionMenu: true, captionEnable: true, menuLoading: true };
+  const page = await meet({}, 'en', faults);
+  for (let n = 0; n < 10; n++) { page.advance(100); await page.scan(); }
+  assert.equal(page.menuClicks(), 1);
+  faults.menuLoading = false;
+  await page.scan();
+  assert.equal(page.enabled(), 1);
+  for (let n = 0; n < 10; n++) { page.advance(100); await page.scan(); }
+  assert.equal(page.enabled(), 1);
+  assert.equal(page.menuClicks(), 1);
+  page.advance(5001); await page.scan();
+  assert.equal(page.enabled(), 2);
 });
