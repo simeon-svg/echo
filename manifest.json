@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Echo",
-  "version": "1.18.1",
+  "version": "1.18.2",
   "incognito": "split",
   "description": "Save Google Meet live captions as local transcripts.",
   "icons": {
@@ -45,7 +45,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://chat.google.com/u/*/embed/space/*"],
+      "matches": ["https://chat.google.com/u/*/embed/space/*", "https://chat.google.com/embed/space/*"],
       "js": ["content/meet-adapter.js", "content/chat.js", "content/chat-bridge.js"],
       "all_frames": true,
       "run_at": "document_idle"

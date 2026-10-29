@@ -6,7 +6,7 @@
   function embeddedURL(raw) {
     try {
       const url = new URL(raw);
-      return url.origin === chatOrigin && /^\/u\/\d+\/embed\/space\/[^/]+$/.test(url.pathname) && url.searchParams.get("origin") === meetOrigin;
+      return url.origin === chatOrigin && /^\/(?:u\/\d+\/)?embed\/space\/[^/]+$/.test(url.pathname) && url.searchParams.get("origin") === meetOrigin;
     } catch { return false; }
   }
   if (location.origin === meetOrigin) {

@@ -88,3 +88,14 @@ contained Echo's announcement. The earlier chat timeout was not reproduced
 live. A regression test does demonstrate that clicking an already expanded
 chat button before its composer loads closes the panel; Echo now waits instead.
 The diagnostic session-finalized event remains unconfirmed as a separate cause.
+
+
+### Follow-up: account-neutral embedded chat URL
+
+In the failing live call on October 29, the parent iframe's `src` used
+`https://chat.google.com/embed/space/<space>` with `origin=https://meet.google.com`.
+The child page displayed an account-qualified `/u/2/embed/space/<space>` URL.
+The bridge previously rejected the parent URL before it could probe the child.
+Version 1.18.2 accepts both paths and registers the helper for both, retaining
+the exact Chat origin and Meet origin parameter checks. No meeting identifiers,
+chat content, or URL tokens are retained in the test fixture.

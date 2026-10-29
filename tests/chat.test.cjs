@@ -107,7 +107,7 @@ test('embedded Chat preserves drafts and never sends after the call ends', async
   }
 });
 
-function framedChat({ draft = '', ready = true, wrongOrigin = false, dropResult = false } = {}) {
+function framedChat({ draft = '', ready = true, wrongOrigin = false, dropResult = false, framePath = '/u/2/embed/space/example' } = {}) {
   const child = embeddedEditor(draft);
   let elapsed = 0;
   const parents = new Set(), children = new Set();
@@ -115,7 +115,7 @@ function framedChat({ draft = '', ready = true, wrongOrigin = false, dropResult 
     postMessage(data) { if (dropResult && data.type === 'result') return; queueMicrotask(() => { for (const fn of parents) fn({ data, source: childWindow, origin: wrongOrigin ? 'https://example.com' : 'https://chat.google.com' }); }); } };
   const childWindow = { parent: parentWindow, addEventListener: (_, fn) => children.add(fn),
     postMessage(data) { queueMicrotask(() => { for (const fn of children) fn({ data, source: parentWindow, origin: 'https://meet.google.com' }); }); } };
-  const frame = { src: 'https://chat.google.com/u/2/embed/space/example?origin=https%3A%2F%2Fmeet.google.com', contentWindow: childWindow,
+  const frame = { src: `https://chat.google.com${framePath}?origin=https%3A%2F%2Fmeet.google.com`, contentWindow: childWindow,
     isConnected: true, getClientRects: () => [1] };
   const query = child.context.document.querySelectorAll;
   child.context.document.querySelectorAll = selector => ready ? query(selector) : [];
@@ -232,4 +232,34 @@ test('an already opening chat panel is not toggled closed while its composer loa
   assert.equal(clicks, 0);
   assert.equal(t.count(), 1);
   assert.equal(t.notice.warning, '');
+});
+
+
+test('Meet recognizes the account-neutral embedded Chat URL used in October', async () => {
+  const t = framedChat({ framePath: '/embed/space/example' });
+  assert.equal(t.parent.MeetEmbeddedChat.frame(), t.frame);
+  await t.notice.send(() => true, () => {});
+  assert.equal(t.child.count(), 1);
+  assert.equal(t.notice.warning, '');
+});
+
+test('embedded chat URL variants still reject unrelated paths and origins', () => {
+  const t = framedChat();
+  for (const url of [
+    'https://example.com/embed/space/example?origin=https://meet.google.com',
+    'https://chat.google.com/embed/space/example?origin=https://example.com',
+    'https://chat.google.com/embed/space/example/extra?origin=https://meet.google.com',
+    'https://chat.google.com/u/not-an-account/embed/space/example?origin=https://meet.google.com',
+    'https://chat.google.com/embed/space/example',
+  ]) {
+    t.frame.src = url;
+    assert.equal(t.parent.MeetEmbeddedChat.frame(), null);
+  }
+});
+
+test('the embedded helper is registered for both observed Google Chat URL variants', () => {
+  const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+  const helper = manifest.content_scripts.find(script => script.all_frames);
+  assert.ok(helper.matches.includes('https://chat.google.com/u/*/embed/space/*'));
+  assert.ok(helper.matches.includes('https://chat.google.com/embed/space/*'));
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.2 — 2026-10-29
+
+- Recognize the new account-neutral Google Chat embed URL used in Meet, including the helper registration, so recording announcements can reach the embedded composer.
+- Keep existing origin, frame identity, draft protection, and single-send checks for both embed URL variants.
+
 ## 1.18.1 — 2026-10-29
 
 - Avoid closing an already opening chat panel while waiting for its message composer.
