@@ -122,3 +122,58 @@ test('self identity is preserved when Meet resolves the account name', () => {
   assert.equal(other.isSelf, false);
   assert.equal(other.speaker, 'Alex');
 });
+
+test('manually enabled captions remain available when the toolbar button disappears', () => {
+  const t = setup();
+  t.captions.shown = false;
+  assert.equal(t.adapter.captionButton(), null);
+  assert.equal(t.adapter.captionsEnabled(), true);
+  assert.equal(t.adapter.captionRows()[0].text, 'Hello');
+  assert.equal(t.adapter.setCaptionsEnabled(true), false);
+  t.region.shown = false;
+  assert.equal(t.adapter.captionsEnabled(), false);
+});
+
+test('October captions menu opens first, then enables live captions without toggling speech translation', () => {
+  const t = setup();
+  t.region.shown = false;
+  t.captions.shown = false;
+  const menu = new Node('button', { 'aria-label': '任意の翻訳', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', 'aria-pressed': 'false' },
+    [new Node('i', { class: 'google-symbols notranslate' }, [], 'translate_cc')]);
+  const translation = new Node('button', { jsname: 'YpX94b' });
+  t.body.children.push(menu, translation);
+  assert.equal(t.adapter.captionButton(), menu);
+  assert.equal(t.adapter.setCaptionsEnabled(true), true);
+  assert.equal(menu.clicks, 1);
+  menu.attributes['aria-expanded'] = 'true';
+  assert.equal(t.adapter.setCaptionsEnabled(true), false, 'do not close the menu while its controls load');
+  t.captions.shown = true;
+  t.captions.children = [new Node('i', { class: 'google-symbols notranslate' }, [], 'check')];
+  assert.equal(t.adapter.setCaptionsEnabled(true), true);
+  assert.equal(t.captions.clicks, 1);
+  assert.equal(translation.clicks, 0);
+  t.region.shown = true;
+  t.captions.shown = false;
+  assert.equal(t.adapter.captionsEnabled(), true);
+  assert.equal(t.adapter.setCaptionsEnabled(true), false);
+  assert.equal(menu.clicks, 1);
+});
+
+test('duplicate caption menus or toggles remain ambiguous and cannot be clicked', () => {
+  const t = setup();
+  t.region.shown = false;
+  t.captions.shown = false;
+  const menu = () => new Node('button', { 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
+    [new Node('i', { class: 'google-symbols notranslate' }, [], 'translate_cc')]);
+  const first = menu(), second = menu();
+  t.body.children.push(first, second);
+  assert.equal(t.adapter.captionButton(), null);
+  assert.equal(t.adapter.setCaptionsEnabled(true), false);
+  assert.equal(first.clicks + second.clicks, 0);
+  assert.equal(t.adapter.diagnostics().captions.candidates, 2);
+  second.shown = false;
+  t.captions.shown = true;
+  t.body.children.push(new Node('button', { jsname: 'RrG0hf' }));
+  assert.equal(t.adapter.captionButton(), null, 'ambiguous toggles must not fall back to the menu');
+  assert.equal(t.adapter.setCaptionsEnabled(true), false);
+});

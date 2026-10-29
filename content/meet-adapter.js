@@ -15,13 +15,20 @@
   }
   const controls = {
     leave: [el => el.getAttribute("jsname") === "CQylAd" || icons(el).includes("call_end"), ["Leave call"]],
-    captions: [el => el.getAttribute("jsname") === "RrG0hf" || icons(el).includes("closed_caption"), ["Turn on captions", "Turn off captions"]],
+    captions: [el => el.getAttribute("jsname") === "RrG0hf" || icons(el).includes("closed_caption"), ["Turn on captions", "Turn off captions", "Turn on live captions", "Turn off live captions"]],
     chat: [el => el.getAttribute("data-panel-id") === "2" && ["chat", "chat_bubble"].some(icon => icons(el).includes(icon)), ["Chat with everyone"]],
     chatSend: [el => (el.getAttribute("jsname") === "SoqoBf" && icons(el).includes("send")) || el.getAttribute("jsname") === "GBTyxb", ["Send a message", "Send message"]],
   };
   const control = key => unique(candidates(...controls[key]));
   const leaveButton = () => control("leave");
-  const captionButton = () => control("captions");
+  // October 2026: some accounts move the live-caption toggle into a
+  // translate_cc menu. Keep the opener distinct from the actual toggle.
+  const isCaptionMenu = el => el.getAttribute("aria-haspopup") === "dialog" && icons(el).includes("translate_cc");
+  function captionCandidates() {
+    const toggles = candidates(...controls.captions);
+    return toggles.length ? toggles : buttons().filter(isCaptionMenu);
+  }
+  const captionButton = () => unique(captionCandidates());
   const chatButton = () => control("chat");
   function regionCandidates() {
     const regions = [...document.querySelectorAll('[role="region"][jscontroller="KPn5nb"]')].filter(visible);
@@ -41,7 +48,7 @@
   }
   function captionsEnabled() {
     const button = captionButton();
-    if (!button) return false;
+    if (!button || isCaptionMenu(button)) return !!captionRegion();
     if (button.getAttribute("jsname") === "RrG0hf" || icons(button).includes("closed_caption")) return !!captionRegion();
     // Old English DOMs may lack the observed caption controller.
     const label = button.getAttribute("aria-label");
@@ -82,13 +89,16 @@
     setCaptionsEnabled(enabled) {
       const button = captionButton();
       if (!button || captionsEnabled() === enabled || button.disabled || button.getAttribute("aria-disabled") === "true") return false;
+      // Opening the menu is only the first step. A later scan picks up the
+      // live-caption toggle after Meet renders it; never close a loading menu.
+      if (isCaptionMenu(button) && button.getAttribute("aria-expanded") === "true") return false;
       button.click(); return true;
     },
     chatInput: () => unique(inputCandidates()),
     chatSendButton: () => control("chatSend"),
     diagnostics() {
       const summary = list => ({ found: list.length === 1, candidates: list.length });
-      return { ...Object.fromEntries(Object.entries(controls).map(([key, definition]) => [key, summary(candidates(...definition))])),
+      return { ...Object.fromEntries(Object.entries(controls).map(([key, definition]) => [key, summary(key === "captions" ? captionCandidates() : candidates(...definition))])),
         chatInput: summary(inputCandidates()), captionRegion: summary(regionCandidates()) };
     },
   };

@@ -43,7 +43,9 @@
         if (!input() && !embedded?.frame()) {
           const open = MeetAdapter.chatButton();
           if (!open) throw new Error("Meeting chat is unavailable. Please announce the transcript manually.");
-          open.click();
+          // The composer can appear after the panel has already opened.
+          // Clicking again here would close it and make readiness time out.
+          if (open.getAttribute("aria-expanded") !== "true") open.click();
         }
         const target = await waitFor(() => {
           const field = input();

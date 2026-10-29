@@ -66,3 +66,25 @@ Regression tests cover the sanitized captured structure, communication between
 two frame contexts, delayed readiness, drafts, cancellation and sender checks.
 The saved HTML establishes the DOM and origin mismatch; a live Google Chat
 delivery after this change still needs confirmation in an actual meeting.
+
+
+## October 29, 2026: captions and translation menu
+
+Observed in the user's live English Meet UI: some accounts retain the old
+`button[jsname="RrG0hf"]` toolbar toggle; others have a toolbar button with
+`aria-haspopup="dialog"`, `aria-expanded`, and a `translate_cc` icon. This
+button opens a menu rather than toggling captions. Inside the menu the live
+caption button retains `jsname="RrG0hf"` and uses `Turn on live captions` /
+`Turn off live captions` labels. Speech translation is a separate control
+(`jsname="YpX94b"`) and must not be clicked to enable captions.
+
+Closing the menu removes the visible live-caption toggle while the caption
+region (`role="region"`, `jscontroller="KPn5nb"`) remains. Region detection
+must therefore work independently of the toggle. Regression tests cover the
+closed menu, two-stage activation, localized labels, and ambiguous controls.
+
+The inspected test call used the existing textarea chat composer and already
+contained Echo's announcement. The earlier chat timeout was not reproduced
+live. A regression test does demonstrate that clicking an already expanded
+chat button before its composer loads closes the panel; Echo now waits instead.
+The diagnostic session-finalized event remains unconfirmed as a separate cause.

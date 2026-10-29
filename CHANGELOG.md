@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.1 — 2026-10-29
+
+- Avoid closing an already opening chat panel while waiting for its message composer.
+- Support Meet’s new Captions and translation menu, opening it before enabling live captions without changing speech translation.
+- Keep reading visible captions when the live-caption toggle is hidden inside the closed menu, avoiding false recording gaps.
+
 ## 1.18.0 — 2026-10-02
 
 - Add an optional, editable AI prompt in Settings with a default meeting-summary prompt.

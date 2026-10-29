@@ -218,3 +218,18 @@ test('a lost result after sending is uncertain and never causes a second announc
   await t.notice.send(() => true, () => {});
   assert.equal(t.child.count(), 1);
 });
+
+test('an already opening chat panel is not toggled closed while its composer loads', async () => {
+  const t = setup();
+  let expanded = true, ready = false, clicks = 0;
+  const open = { getAttribute: key => key === 'aria-expanded' ? String(expanded) : null,
+    click() { clicks++; expanded = !expanded; } };
+  t.context.MeetAdapter.chatInput = () => ready && expanded ? t.field : null;
+  t.context.MeetAdapter.chatButton = () => open;
+  // Accelerate polling while retaining the delayed-composer sequence.
+  t.context.setTimeout = resolve => { ready = true; queueMicrotask(resolve); };
+  await t.notice.send(() => true, () => {});
+  assert.equal(clicks, 0);
+  assert.equal(t.count(), 1);
+  assert.equal(t.notice.warning, '');
+});
